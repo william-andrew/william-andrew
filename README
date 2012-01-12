@@ -5,3 +5,4 @@ sd opened == git status -s
 sd sync == git pull
 sd revert == git reset
 sd submit == git commit
+dont use git checkout
