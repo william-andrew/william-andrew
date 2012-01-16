@@ -6,4 +6,4 @@ sd sync == git pull
 sd revert == git reset
 sd submit == git commit + git push
 dont use git checkout
-make sure you call git push at the end to actually submit it to remote server
+make sure you call git push at the end to actually submit it to remote server!
