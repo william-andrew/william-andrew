@@ -1,3 +1,4 @@
+test
 common git commands mapping to sd commands
 sd edit == git checkout
 sd add == git add
