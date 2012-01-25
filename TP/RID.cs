@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
 using ExtensionMethods;
 
@@ -27,8 +28,8 @@ namespace TP
      * Valid prefix is 'F', 'R', 'C', which correspond to Flight, Room, and Car.
      * {@link #getName()} returns the identifier part.
      */
-    [System.Serializable()]
-    public class RID : IComparable<RID> {
+    [Serializable()]
+    public class RID : IComparable<RID>,Lockable{
     
     private static readonly long serialVersionUID = 7717150775758337149L;
     public static String _prefixes = "!FRC";
@@ -165,16 +166,7 @@ namespace TP
         return new RID(t,id);
     }
     
-    /*private void writeObject(java.io.ObjectOutputStream out) throws IOException {
-        out.writeUTF(this.toString());
-    }
     
-    private void readObject(Stream _in)
-    {
-        String s = _in.rereadUTF();
-        type = Type.getInstance(s);
-        name = s.substring(2);
-    }*/
 }
 
     
