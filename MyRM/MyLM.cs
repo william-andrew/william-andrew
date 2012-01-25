@@ -250,7 +250,7 @@ namespace MyRM
                         return;
                     }
                     else if (lockTarget.DownGradedLockRequest(context, mode))
-                        // ‘context’ has a write lock on lockTarget and requested a read lock so no action is required.                        // 
+                        // ‘context?has a write lock on lockTarget and requested a read lock so no action is required.                        // 
                         return;
 
                     // Add code here to attempt lock conversion
