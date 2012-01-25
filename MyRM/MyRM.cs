@@ -214,6 +214,7 @@ namespace MyRM
         /// <returns></returns>
         public bool Add(TP.Transaction context, TP.RID i, int count, int price)
         {
+
             Resource res = TransactionStorage.Read(context, i);
             if (res == null)
             {
