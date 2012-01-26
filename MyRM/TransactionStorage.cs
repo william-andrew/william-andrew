@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 using TP;
 using System.Threading;
 
@@ -23,7 +25,13 @@ namespace MyRM
         /// </summary>
         private Dictionary<Customer, HashSet<RID>> reservations;
 
+        private const string ReservationTableName = "Reservations";
+        private const string ResourcesTableName = "Resources";
+
         private static TransactionStorage primary = new TransactionStorage();
+
+        // Generic data persistence 
+        private static MyDatabase myDatabase = new MyDatabase();
 
         /// <summary>
         /// This can support multiple transactions at the same time 
@@ -209,6 +217,9 @@ namespace MyRM
         /// <returns></returns>
         public Dictionary<Customer, HashSet<RID>> GetReservations()
         {
+            var xml = myDatabase.ReadTable(ReservationTableName);
+            Dictionary<Customer, HashSet<RID>> dict = DeserializeReservations(xml);
+            this.reservations = dict;
             return this.reservations;
         }
 
@@ -218,6 +229,8 @@ namespace MyRM
         /// <param name="reservations"></param>
         public void SetReservations(Dictionary<Customer, HashSet<RID>> reservations)
         {
+            string xml = SerializeReservations(reservations);
+            myDatabase.WriteTable(ReservationTableName, xml);
             this.reservations = reservations;
         }
 
@@ -227,6 +240,9 @@ namespace MyRM
         /// <returns></returns>
         public Dictionary<RID, Resource> GetResources()
         {
+            var xml = myDatabase.ReadTable(ResourcesTableName);
+            Dictionary<RID, Resource> r = DeserializeResources(xml);
+            this.resources = r;
             return this.resources;
         }
 
@@ -236,6 +252,9 @@ namespace MyRM
         /// <param name="resources"></param>
         public void SetResources(Dictionary<RID, Resource> resources)
         {
+            string xml = SerializeResource(resources);
+            myDatabase.WriteTable(ResourcesTableName, xml);
+
             this.resources = resources;
         }
 
@@ -298,5 +317,98 @@ namespace MyRM
 
             return shadow;
         }
+
+        private Dictionary<Customer, HashSet<RID>> DeserializeReservations(string xml)
+        {
+            var result = new Dictionary<Customer, HashSet<RID>>();
+            var xdoc = XDocument.Load(new StringReader(xml));
+            var root = xdoc.Element("Reservations");
+            if (root == null)
+                return result;
+
+            foreach(var e in root.Elements())
+            {
+                var c = new Customer
+                                 {
+                                     Id = new Guid(e.Attribute("Customer").Value)
+                                 };
+
+                var items = new HashSet<RID>(); 
+            
+                foreach (var i in e.Elements())
+                {
+                    TP.RID.Type t;
+                    Enum.TryParse(i.Attribute("Type").Value, true, out t);
+
+                    var value = i.Attribute("Name").Value;
+                    var rid = new RID(t, value);
+                    items.Add(rid);
+                }
+                result.Add(c, items);
+            }
+            return result;
+        }
+
+        private static string SerializeReservations(Dictionary<Customer, HashSet<RID>> reservations)
+        {
+            var xdoc = new XDocument();
+            var root = new XElement("Reservations");
+            xdoc.Add(root);
+
+            foreach (var c in reservations)
+            {
+                var e = new XElement("Reservation", new XAttribute("Customer", c.Key.Id.ToString()));
+                root.Add(e);
+                foreach (var r in c.Value)
+                {
+                    e.Add(new XElement("RID", new XAttribute("Type", r.getType()), new XAttribute("Name", r.getName())));
+                }
+            }
+            return xdoc.ToString();
+        }
+
+        private string SerializeResource(Dictionary<RID, Resource> dictionary)
+        {
+            var xdoc = new XDocument();
+            var root = new XElement("Resources");
+            xdoc.Add(root);
+
+            foreach (var r in dictionary)
+            {
+                var e = new XElement("Resource", new XAttribute("Type",  r.Key.getType()), 
+                    new XAttribute("Name",  r.Key.getName()),
+                    new XAttribute("Price",  r.Value.getPrice()),
+                    new XAttribute("Count",  r.Value.getCount())                                       
+                    );
+                root.Add(e);
+            }
+            return xdoc.ToString();            
+        }
+
+        private Dictionary<RID, Resource> DeserializeResources(string xml)
+        {
+            var result = new Dictionary<RID, Resource>();
+            var xdoc = XDocument.Load(new StringReader(xml));
+            var root = xdoc.Element("Resources");
+
+            if (root == null)
+                return result;
+
+            foreach (var e in root.Elements())
+            {
+                TP.RID.Type t;
+                Enum.TryParse(e.Attribute("Type").Value, true, out t);
+                var name = e.Attribute("Name").Value;
+                var c = int.Parse(e.Attribute("Count").Value);
+                var p = int.Parse(e.Attribute("Price").Value);
+
+                var key = new RID(t, name);
+                var item = new Resource(key, c, p);
+
+                result.Add(key, item);
+            }
+            return result;
+        }
     }
 }
+

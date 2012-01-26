@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ITransactionStorage.cs" />
+    <Compile Include="MyDatabase.cs" />
     <Compile Include="MyLM.cs" />
     <Compile Include="MyRM.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
