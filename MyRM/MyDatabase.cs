@@ -37,7 +37,7 @@ namespace MyRM
         /// <param name="data"></param>
         public void WriteTable(string tableName, string data)
         {
-            if (ContainsTable(tableName))
+            if (!ContainsTable(tableName))
             {
                 RegisterTable(tableName);
             }
@@ -55,7 +55,7 @@ namespace MyRM
         {
             if (!ContainsTable(tableName))
             {
-                throw new ArgumentException("table not exists");
+                throw new ArgumentException("table not exists - " + tableName, tableName);
             }
 
             string tablenPath;
@@ -63,7 +63,11 @@ namespace MyRM
             {
                 tablenPath = _tables[tableName];
             }
-            return File.ReadAllText(tablenPath);
+
+            //TODO: fix this, add db intialization code
+            if (File.Exists(tablenPath))
+                return File.ReadAllText(tablenPath);
+            else return null;
         }
 
         public void RegisterTable(string tableName)
