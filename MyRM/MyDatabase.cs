@@ -80,9 +80,12 @@ namespace MyRM
 
         public void ReadDatabaseManifest()
         {
-            var xdoc = XDocument.Load(DatbaseManifestFileName);
-            var tables = xdoc.Descendants("Table").ToDictionary(e => e.Attribute("Name").Value, e => e.Attribute("File").Value);
-            _tables = tables;
+            if (File.Exists(DatbaseManifestFileName))
+            {
+                var xdoc = XDocument.Load(DatbaseManifestFileName);
+                var tables = xdoc.Descendants("Table").ToDictionary(e => e.Attribute("Name").Value, e => e.Attribute("File").Value);
+                _tables = tables;
+            }
         }
 
         /// <summary>

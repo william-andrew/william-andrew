@@ -13,7 +13,7 @@ namespace MyRM
     /// TransactionStorage holds all three kinds of resource (Car, Hotel, Flight) in the same
     /// resouces variable
     /// </summary>
-    public class TransactionStorage:ITransactionStorage
+    public class TransactionStorage
     {
         /// <summary>
         /// Resources, in shadow, this is a full copy of the primary
@@ -24,6 +24,7 @@ namespace MyRM
         /// Reservations, in shadow, this is a full copy of the primary
         /// </summary>
         private Dictionary<Customer, HashSet<RID>> reservations;
+        private bool isInitialized = false;
 
         private const string ReservationTableName = "Reservations";
         private const string ResourcesTableName = "Resources";
@@ -45,9 +46,12 @@ namespace MyRM
             myDatabase = new MyDatabase();
             myDatabase.RegisterTable(ResourcesTableName);
             myDatabase.RegisterTable(ReservationTableName);
-            
-            this.resources = GetResources();
-            this.reservations = GetReservations();
+        }
+
+        public void Init()
+        {   
+            this.LoadFromDisk();
+            this.isInitialized = true;
         }
 
         /// <summary>
@@ -62,9 +66,8 @@ namespace MyRM
             context.Id = Guid.Empty;
             try
             {
-                //TODO: fix me
-                shadows[context].SetReservations();
-                shadows[context].SetResources();
+                //TODO: Shall writeback before in memory pointer change???
+                shadows[context].WriteBackToDisk();
 
                 Interlocked.Exchange<TransactionStorage>(ref primary, shadows[context]);
                 shadows.Remove(context); 
@@ -225,9 +228,7 @@ namespace MyRM
         /// <returns></returns>
         public Dictionary<Customer, HashSet<RID>> GetReservations()
         {
-            var xml = myDatabase.ReadTable(ReservationTableName);
-            Dictionary<Customer, HashSet<RID>> dict = DeserializeReservations(xml);
-            this.reservations = dict;
+
             return this.reservations;
         }
 
@@ -235,46 +236,44 @@ namespace MyRM
         /// Set the reservations for another method who loads the data from stable storage
         /// </summary>
         /// <param name="reservations"></param>
-        public void SetReservations(Dictionary<Customer, HashSet<RID>> reservations)
+        public void WriteBackToDisk()
         {
-            string xml = SerializeReservations(reservations);
+            string xml = SerializeReservations(this.reservations);
             myDatabase.WriteTable(ReservationTableName, xml);
-            this.reservations = reservations;
+            xml = SerializeResource(this.resources);
+            myDatabase.WriteTable(ResourcesTableName, xml);
         }
 
         /// <summary>
-        /// Get resources for the method who write data to stable storage
+        /// Get resources for the method who write data to stable storage.
+        /// 
+        /// If the database does not exists on disk, it will create an empty one in memory. 
         /// </summary>
         /// <returns></returns>
-        public Dictionary<RID, Resource> GetResources()
+        public Dictionary<RID, Resource> LoadFromDisk()
         {
+            myDatabase.ReadDatabaseManifest();
             var xml = myDatabase.ReadTable(ResourcesTableName);
-            Dictionary<RID, Resource> r = DeserializeResources(xml);
-            this.resources = r;
+            if (string.IsNullOrEmpty(xml))
+            {
+                this.resources = new Dictionary<RID, Resource>();
+            }
+            else
+            {
+                this.resources = DeserializeResources(xml);
+            }
+
+            xml = myDatabase.ReadTable(ReservationTableName);
+            if (string.IsNullOrEmpty(xml))
+            {
+                this.reservations = new Dictionary<Customer, HashSet<RID>>();
+            }
+            else
+            {
+                this.reservations = DeserializeReservations(xml);
+            }
+
             return this.resources;
-        }
-
-        /// <summary>
-        /// Sets the resources for the method who loads data from stable storage
-        /// </summary>
-        /// <param name="resources"></param>
-        public void SetResources(Dictionary<RID, Resource> resources)
-        {
-            string xml = SerializeResource(resources);
-            myDatabase.WriteTable(ResourcesTableName, xml);
-
-            this.resources = resources;
-        }
-
-        //TODO: fix me, not good in this way
-        public void SetReservations() 
-        {
-            SetReservations(this.reservations);
-        }
-
-        public void SetResources()
-        {
-            SetResources(this.resources);
         }
 
         /// <summary>
@@ -292,6 +291,10 @@ namespace MyRM
             // Now we only use the dummy context id (all 0s) because the TestBase.cs generates new transaction id before submitting the Car adds and Room add.
             context.Id = Guid.Empty;
 
+            if (!primary.isInitialized)
+            {
+                primary.Init();
+            }
             if (!shadows.TryGetValue(context, out storage))
             {
                 storage = primary;
@@ -311,6 +314,10 @@ namespace MyRM
             // TODO: implment lock on the transaction to make sure the content of primary is not changed when copying
             // Now we only use the dummy context id (all 0s) because the TestBase.cs generates new transaction id before submitting the Car adds and Room add.
             context.Id = Guid.Empty;
+            if (!primary.isInitialized)
+            {
+                primary.Init();
+            }
 
             TransactionStorage shadow;
             if (!shadows.TryGetValue(context, out shadow))
