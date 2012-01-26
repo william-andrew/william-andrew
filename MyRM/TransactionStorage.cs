@@ -31,7 +31,7 @@ namespace MyRM
         private static TransactionStorage primary = new TransactionStorage();
 
         // Generic data persistence 
-        private static MyDatabase myDatabase = new MyDatabase();
+        private MyDatabase myDatabase;
 
         /// <summary>
         /// This can support multiple transactions at the same time 
@@ -42,8 +42,12 @@ namespace MyRM
 
         private TransactionStorage()
         {
-            this.resources = new Dictionary<RID, Resource>();
-            this.reservations = new Dictionary<Customer, HashSet<RID>>();
+            myDatabase = new MyDatabase();
+            myDatabase.RegisterTable(ResourcesTableName);
+            myDatabase.RegisterTable(ReservationTableName);
+            
+            this.resources = GetResources();
+            this.reservations = GetReservations();
         }
 
         /// <summary>
@@ -321,6 +325,9 @@ namespace MyRM
         private Dictionary<Customer, HashSet<RID>> DeserializeReservations(string xml)
         {
             var result = new Dictionary<Customer, HashSet<RID>>();
+            if (xml == null)
+                return result;
+
             var xdoc = XDocument.Load(new StringReader(xml));
             var root = xdoc.Element("Reservations");
             if (root == null)
@@ -388,6 +395,9 @@ namespace MyRM
         private Dictionary<RID, Resource> DeserializeResources(string xml)
         {
             var result = new Dictionary<RID, Resource>();
+            if (xml == null)
+                return result;
+
             var xdoc = XDocument.Load(new StringReader(xml));
             var root = xdoc.Element("Resources");
 
