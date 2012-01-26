@@ -62,8 +62,12 @@ namespace MyRM
             context.Id = Guid.Empty;
             try
             {
+                //TODO: fix me
+                shadows[context].SetReservations();
+                shadows[context].SetResources();
+
                 Interlocked.Exchange<TransactionStorage>(ref primary, shadows[context]);
-                shadows.Remove(context);
+                shadows.Remove(context); 
             }
             catch (Exception)
             {
@@ -260,6 +264,17 @@ namespace MyRM
             myDatabase.WriteTable(ResourcesTableName, xml);
 
             this.resources = resources;
+        }
+
+        //TODO: fix me, not good in this way
+        public void SetReservations() 
+        {
+            SetReservations(this.reservations);
+        }
+
+        public void SetResources()
+        {
+            SetResources(this.resources);
         }
 
         /// <summary>

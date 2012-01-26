@@ -55,7 +55,7 @@ namespace MyRM
         {
             if (!ContainsTable(tableName))
             {
-                throw new ArgumentException("table not exists" + tableName, tableName);
+                throw new ArgumentException("table not exists - " + tableName, tableName);
             }
 
             string tablenPath;
