@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
@@ -8,7 +9,19 @@ namespace MyRM
 {
     public class MyDatabase
     {
+        private readonly string _databaseName;
+        private bool _isInitialized;
         private Dictionary<string, string> _tables = new Dictionary<string, string>();
+
+        public MyDatabase(string databaseName, bool isIntializationRequired = true)
+        {
+            _databaseName = databaseName;
+
+            if (isIntializationRequired)
+            {
+                Initialize();
+            }
+        }
 
         public string[] Tables
         {
@@ -22,7 +35,54 @@ namespace MyRM
 
         public string DatabaseName
         {
-            get { return "MyDatabase"; }
+            get { return _databaseName; }
+        }
+
+        private string DebuggingInfo
+        {
+            get { return " PID=" + this.GetProcessId(); }            
+        }
+
+        private string DatabaseManifestFileName
+        {
+            get { return DatabaseName + @".manifest"; }
+        }
+
+        public void Initialize(bool autoRecovery = true)
+        {
+            if (File.Exists(DatabaseManifestFileName))
+                ReadDatabaseManifest();
+            else
+            {
+                if (IsRecoverable())
+                {
+                    if (autoRecovery)
+                        RecoverDatabase();
+                    else
+                        throw new ApplicationException("The database " + DatabaseName + " requires recovery." + DebuggingInfo);
+                }
+                BuildNewDatabase();
+            }
+            _isInitialized = true;
+        }
+
+        private void BuildNewDatabase()
+        {
+            WriteDatabaseManifest();
+        }
+
+        private void RecoverDatabase()
+        {
+            if (File.Exists(DatabaseManifestFileName + ".tmp"))
+                File.Move(DatabaseManifestFileName + ".tmp", DatabaseManifestFileName);
+            else if (File.Exists(DatabaseManifestFileName + ".bak"))
+                File.Move(DatabaseManifestFileName + ".bak", DatabaseManifestFileName);
+        }
+
+        private bool IsRecoverable()
+        {
+            return (File.Exists(DatabaseManifestFileName + ".tmp") ||
+                    File.Exists(DatabaseManifestFileName + ".bak"));
         }
 
         public bool ContainsTable(string tableName)
@@ -37,14 +97,16 @@ namespace MyRM
         /// <param name="data"></param>
         public void WriteTable(string tableName, string data)
         {
+            EnsureInitialized();
+
             if (!ContainsTable(tableName))
             {
-                RegisterTable(tableName);
+                throw new ArgumentException("table not exists - " + tableName +  DebuggingInfo , tableName);
             }
 
             lock (_tables)
             {
-                var newTablenName = IncrementTableVersion(tableName);
+                string newTablenName = IncrementTableVersion(tableName);
 
                 File.WriteAllText(newTablenName, data);
                 WriteDatabaseManifest();
@@ -53,9 +115,11 @@ namespace MyRM
 
         public string ReadTable(string tableName)
         {
+            EnsureInitialized();
+
             if (!ContainsTable(tableName))
             {
-                throw new ArgumentException("table not exists - " + tableName, tableName);
+                throw new ArgumentException("table not exists - " + tableName + DebuggingInfo, tableName);
             }
 
             string tablenPath;
@@ -63,29 +127,43 @@ namespace MyRM
             {
                 tablenPath = _tables[tableName];
             }
-
-            //TODO: fix this, add db intialization code
-            if (File.Exists(tablenPath))
-                return File.ReadAllText(tablenPath);
-            else return null;
+            return File.ReadAllText(tablenPath);
         }
 
-        public void RegisterTable(string tableName)
+        public void CreateTable(string tableName)
         {
+            EnsureInitialized();
+
             if (!ContainsTable(tableName))
             {
-                _tables.Add(tableName, tableName + ".table");
-            }            
+                var tableFileName = InitializeTable(tableName);
+                _tables.Add(tableName, tableFileName);
+            }
+        }
+
+        private string InitializeTable(string tableName)
+        {
+            string newTablenName = this.GetVersionedTableName(tableName);
+
+            lock (_tables)
+            {
+                File.WriteAllText(newTablenName, String.Empty);
+                WriteDatabaseManifest();
+                return newTablenName;
+            }
         }
 
         public void ReadDatabaseManifest()
         {
-            if (File.Exists(DatbaseManifestFileName))
+            if (!File.Exists(DatabaseManifestFileName))
             {
-                var xdoc = XDocument.Load(DatbaseManifestFileName);
-                var tables = xdoc.Descendants("Table").ToDictionary(e => e.Attribute("Name").Value, e => e.Attribute("File").Value);
-                _tables = tables;
+                throw new ApplicationException("The manifest of the database " + DatabaseName + " is missing." + DebuggingInfo);
             }
+
+            XDocument xdoc = XDocument.Load(DatabaseManifestFileName);
+            Dictionary<string, string> tables = xdoc.Descendants("Table").ToDictionary(e => e.Attribute("Name").Value,
+                                                                                       e => e.Attribute("File").Value);
+            _tables = tables;
         }
 
         /// <summary>
@@ -102,16 +180,17 @@ namespace MyRM
                 var e = new XElement("Table", new XAttribute("Name", t.Key), new XAttribute("File", t.Value));
                 root.Add(e);
             }
-            xdoc.Save(DatbaseManifestFileName + ".tmp");
+            xdoc.Save(DatabaseManifestFileName + ".tmp");
 
-            if (File.Exists(DatbaseManifestFileName))
+            if (File.Exists(DatabaseManifestFileName))
             {
-                File.Replace(DatbaseManifestFileName + ".tmp", DatbaseManifestFileName, DatbaseManifestFileName + ".bak");
-                File.Delete(DatbaseManifestFileName + ".bak");
+                File.Replace(DatabaseManifestFileName + ".tmp", DatabaseManifestFileName,
+                             DatabaseManifestFileName + ".bak");
+                File.Delete(DatabaseManifestFileName + ".bak");
             }
             else
             {
-                File.Move(DatbaseManifestFileName + ".tmp", DatbaseManifestFileName);
+                File.Move(DatabaseManifestFileName + ".tmp", DatabaseManifestFileName);
             }
         }
 
@@ -120,15 +199,27 @@ namespace MyRM
             return _tables[tableName];
         }
 
-        private string DatbaseManifestFileName
+        private string GetVersionedTableName(string tableName)
         {
-            get { return DatabaseName + @".manifest"; }
+            return DatabaseName + "." + tableName + ".table." + Guid.NewGuid();
         }
 
         private string IncrementTableVersion(string tableName)
         {
-            this._tables[tableName] = tableName + ".table." + Guid.NewGuid();
-            return this._tables[tableName];
+            _tables[tableName] = GetVersionedTableName(tableName);
+            return _tables[tableName];
+        }
+
+        private void EnsureInitialized()
+        {
+            if (!_isInitialized)
+                throw new ApplicationException("The database " + DatabaseName + " is not initialized." + DebuggingInfo);
+        }
+
+        private int GetProcessId()
+        {
+            Process currentProcess = Process.GetCurrentProcess();
+            return currentProcess.Id;
         }
     }
 }

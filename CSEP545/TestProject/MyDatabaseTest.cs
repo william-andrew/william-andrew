@@ -10,11 +10,11 @@ namespace TestProject
         [TestMethod]
         public void GetDatabaseManifestTest()
         {
-            var db = new MyDatabase();
-            db.RegisterTable("Inventory.Car");
+            var db = new MyDatabase("CarDatabase");
+            db.CreateTable("Inventory.Car");
             db.WriteDatabaseManifest();
 
-            db.RegisterTable("Inventory.Room");            
+            db.CreateTable("Inventory.Room");            
             db.WriteDatabaseManifest();
 
             db.ReadDatabaseManifest();
