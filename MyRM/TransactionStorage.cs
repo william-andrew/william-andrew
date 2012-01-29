@@ -43,13 +43,17 @@ namespace MyRM
 
         private TransactionStorage()
         {
-            myDatabase = new MyDatabase();
-            myDatabase.RegisterTable(ResourcesTableName);
-            myDatabase.RegisterTable(ReservationTableName);
+            myDatabase = new MyDatabase("FIXME");
+            myDatabase.CreateTable(ResourcesTableName);
+            myDatabase.CreateTable(ReservationTableName);
         }
 
         public void Init()
-        {   
+        {
+            myDatabase = new MyDatabase("FIXME");
+            myDatabase.CreateTable(ResourcesTableName);
+            myDatabase.CreateTable(ReservationTableName);
+
             this.LoadFromDisk();
             this.isInitialized = true;
         }
@@ -252,7 +256,6 @@ namespace MyRM
         /// <returns></returns>
         public Dictionary<RID, Resource> LoadFromDisk()
         {
-            myDatabase.ReadDatabaseManifest();
             var xml = myDatabase.ReadTable(ResourcesTableName);
             if (string.IsNullOrEmpty(xml))
             {
