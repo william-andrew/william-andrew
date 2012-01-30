@@ -52,6 +52,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MyDatabaseTest.cs" />
+    <Compile Include="MyLMTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TransactionStorageTest.cs" />
   </ItemGroup>
@@ -62,6 +63,14 @@
     <ProjectReference Include="..\..\MyRM\MyRM.csproj">
       <Project>{D632D16C-AFD4-4817-81ED-EC73552D4E1D}</Project>
       <Name>MyRM</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\MyTM\MyTM.csproj">
+      <Project>{B2C1FFA8-CC67-4193-8912-D3E93741B328}</Project>
+      <Name>MyTM</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\MyWC\MyWC.csproj">
+      <Project>{C8ADCE06-0461-4588-BAC7-DAD9CEBF4C13}</Project>
+      <Name>MyWC</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\TP\TP.csproj">
       <Project>{CE08CD45-05C9-49E9-966C-2E893060B316}</Project>

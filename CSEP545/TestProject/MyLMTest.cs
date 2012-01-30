@@ -217,6 +217,5 @@ namespace TestProject
             target.UnlockWrite(context, resource);
             target.LockForWrite(context2, resource);
         }
-
     }
 }
