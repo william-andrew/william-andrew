@@ -53,6 +53,7 @@
   <ItemGroup>
     <Compile Include="MyDatabaseTest.cs" />
     <Compile Include="MyLMTest.cs" />
+    <Compile Include="MyRMTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TransactionStorageTest.cs" />
   </ItemGroup>

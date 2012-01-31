@@ -190,6 +190,7 @@ namespace MyRM
         {
             // transactionManager.Commit(context);
             TransactionStorage.Commit(context);
+            lockManager.UnlockAll(context);
         }
 
         /// <summary>
@@ -200,6 +201,7 @@ namespace MyRM
         {
             // transactionManager.Abort(context);
             TransactionStorage.Abort(context);
+            lockManager.UnlockAll(context);
         }
 
 
@@ -214,7 +216,7 @@ namespace MyRM
         /// <returns></returns>
         public bool Add(TP.Transaction context, TP.RID i, int count, int price)
         {
-
+            lockManager.LockForWrite(context, i);
             Resource res = TransactionStorage.Read(context, i);
             if (res == null)
             {
@@ -224,8 +226,6 @@ namespace MyRM
             {
                 res.incrCount(count);
                 res.setPrice(price);
-
-                // TODO add locking code here
             }
 
             TransactionStorage.Write(context, i, res);
@@ -241,7 +241,7 @@ namespace MyRM
         /// <returns></returns>
         public bool Delete(TP.Transaction context, RID rid)
         {
-            // TODO add locking code here
+            lockManager.LockForWrite(context, rid);
             bool removed = TransactionStorage.Delete(context, rid);
 
             // drop all reservations on removed resource
@@ -262,14 +262,14 @@ namespace MyRM
         /// <summary>
         /// Deletes certain amount of resource.
         /// </summary>
-        /// <param name="xid"></param>
+        /// <param name="context"></param>
         /// <param name="rid"></param>
         /// <param name="count"></param>
         /// <returns>true the given resources exists. False if not</returns>
-        public bool Delete(Transaction xid, RID rid, int count)
+        public bool Delete(Transaction context, RID rid, int count)
         {
-            // TODO add locking code here
-            Resource resource = TransactionStorage.Read(xid, rid); ;
+            lockManager.LockForWrite(context, rid);
+            Resource resource = TransactionStorage.Read(context, rid); ;
 
             if (resource == null)
             {
@@ -287,7 +287,7 @@ namespace MyRM
                     resource.setCount(0);
                 }
 
-                TransactionStorage.Write(xid, rid, resource);
+                TransactionStorage.Write(context, rid, resource);
             }
             return true;
         }
@@ -304,6 +304,7 @@ namespace MyRM
         /// </summary>
         public void Shutdown()
         {
+            // TODO: Add lock code here if needed
         }
 
         /// <summary>
@@ -328,6 +329,7 @@ namespace MyRM
         /// <returns>returns the amount available for the specified item type */</returns>
         public int Query(TP.Transaction context, RID rid)
         {
+            lockManager.LockForRead(context, rid);
             Console.WriteLine("RM: Query");
             Resource resource = TransactionStorage.Read(context, rid);
 
@@ -342,12 +344,13 @@ namespace MyRM
         /// <summary>
         /// Queries the price of given resource
         /// </summary>
-        /// <param name="xid"></param>
+        /// <param name="context"></param>
         /// <param name="rid"></param>
         /// <returns>returns the price for the specified item type</returns>
-        public int QueryPrice(Transaction xid, RID rid)
+        public int QueryPrice(Transaction context, RID rid)
         {
-            Resource resource = TransactionStorage.Read(xid, rid);
+            lockManager.LockForRead(context, rid);
+            Resource resource = TransactionStorage.Read(context, rid);
 
             if (resource == null)
             {
@@ -365,6 +368,7 @@ namespace MyRM
         /// <returns>the string of the list of reserved resources for the customer</returns>
         public String QueryReserved(Transaction context, Customer customer)
         {
+            lockManager.LockForRead(context, customer);
             StringBuilder buf = new StringBuilder(512);
 
             HashSet<RID> reserved = TransactionStorage.Read(context, customer);
@@ -392,6 +396,7 @@ namespace MyRM
         {
             int bill = 0;
 
+            lockManager.LockForRead(context, customer);
             HashSet<RID> reserved = TransactionStorage.Read(context, customer);
             if (reserved != null)
             {
@@ -419,6 +424,8 @@ namespace MyRM
         /// <returns>true if reservation is successful</returns>
         public bool Reserve(Transaction context, Customer c, RID i)
         {
+            lockManager.LockForWrite(context, c);
+            lockManager.LockForWrite(context, i);
             Resource resource = TransactionStorage.Read(context, i);
 
             if (resource == null)
@@ -451,6 +458,7 @@ namespace MyRM
         /// <param name="c"></param>
         public void UnReserve(Transaction context, Customer c)
         {
+            lockManager.LockForWrite(context, c);
             HashSet<RID> r = TransactionStorage.Read(context, c);
             if (r == null)
             {
@@ -458,9 +466,9 @@ namespace MyRM
             }
             else
             {
-                // TODO need to add lock
                 foreach (RID rid in r)
                 {
+                    lockManager.LockForWrite(context, rid);
                     Resource resource = TransactionStorage.Read(context, rid);
                     if (resource == null)
                     {

@@ -57,5 +57,98 @@ namespace TestProject
             //Assert.AreEqual(550, result[rid2].getPrice());
             //Assert.AreEqual("53", result[rid2].getName());
         }
+
+        [TestCleanup()]
+        public void Cleanup()
+        {
+            TransactionStorage_Accessor tr = new TransactionStorage_Accessor();
+            TransactionStorage_Accessor.CleanUp();
+        }
+
+        /// <summary>
+        ///A test for Abort
+        /// Also test that write is write to shadow and the read from this transaction will get the new value
+        ///</summary>
+        [TestMethod()]
+        public void AbortTest()
+        {
+            Transaction context = new Transaction();
+            Transaction context1 = new Transaction();
+            RID rid = new RID(RID.Type.FLIGHT, "test");
+            TransactionStorage.Write(context, rid, new Resource(rid, 10, 11));
+            Resource res = TransactionStorage.Read(context, rid);
+            Assert.AreEqual(11, res.getPrice());
+            TransactionStorage.Abort(context);
+            res = TransactionStorage.Read(context, rid);
+            Assert.IsNull(res);
+        }
+
+        /// <summary>
+        ///A test for Commit
+        /// Also test that write is writen to shadow and the read from other transaction will get the old value
+        ///</summary>
+        [TestMethod()]
+        public void CommitTest()
+        {
+            Transaction context = new Transaction();
+            Transaction context1 = new Transaction();
+            RID rid = new RID(RID.Type.FLIGHT, "test");
+            TransactionStorage.Write(context, rid, new Resource(rid, 10, 11));
+            Resource res = TransactionStorage.Read(context1, rid);
+            Assert.IsNull(res);
+            TransactionStorage.Commit(context);
+            res = TransactionStorage.Read(context, rid);
+            Assert.AreEqual(11, res.getPrice());
+        }
+
+        /// <summary>
+        ///A test for Delete resource
+        /// Also test Write for resource
+        ///</summary>
+        [TestMethod()]
+        public void DeleteTest()
+        {
+            Transaction context = new Transaction();
+            RID rid = new RID(RID.Type.FLIGHT, "test");
+            TransactionStorage.Write(context, rid, new Resource(rid, 10, 11));
+            TransactionStorage.Delete(context, rid);
+            Resource res = TransactionStorage.Read(context, rid);
+            Assert.IsNull(res);
+        }
+
+        /// <summary>
+        ///A test for Delete customers
+        ///Also tests GetCustomers;
+        ///</summary>
+        [TestMethod()]
+        public void DeleteTest1()
+        {
+            Transaction context = new Transaction();
+            RID rid = new RID(RID.Type.FLIGHT, "test");
+            Customer c = new Customer();
+            HashSet<RID> reservations = new HashSet<RID>();
+            reservations.Add(rid);
+            TransactionStorage.Write(context, c, reservations);
+            TransactionStorage.Delete(context, c);
+            List<Customer> cs = new List<Customer>(TransactionStorage.GetCustomers(context));
+            Assert.AreEqual(0, cs.Count);
+        }
+
+        /// <summary>
+        ///A test for Read & Write customer resevations
+        ///</summary>
+        [TestMethod()]
+        public void ReadWriteTest()
+        {
+            Transaction context = new Transaction();
+            RID rid = new RID(RID.Type.FLIGHT, "test");
+            Customer c = new Customer();
+            HashSet<RID> reservations = new HashSet<RID>();
+            reservations.Add(rid);
+            TransactionStorage.Write(context, c, reservations);
+            HashSet<RID> actual;
+            actual = TransactionStorage.Read(context, c);
+            Assert.AreEqual(reservations, actual);
+        }
     }
 }

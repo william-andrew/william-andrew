@@ -59,22 +59,30 @@ namespace MyRM
         }
 
         /// <summary>
+        /// For unit test to clean up the whole object
+        /// </summary>
+        private static void CleanUp()
+        {
+            primary = new TransactionStorage();
+            shadows = new Dictionary<Transaction, TransactionStorage>();
+            primary.Init();
+        }
+        /// <summary>
         /// Commit the transaction and remove the shadow
         /// </summary>
         /// <param name="context">Design for supporting multiple transactions</param>
         public static void Commit(Transaction context)
         {
-            // TODO: lock the whole object
             // TODO: make it commit only the changed pages
-            // Now we only use the dummy context id (all 0s) because the TestBase.cs generates new transaction id before submitting the Car adds and Room add.
-            context.Id = Guid.Empty;
+            // TODO: Make sure pages written by other transactions get updated in this shadow before this shadow is commited. Making dirty record is enough for this operation because lockmanager ensures no other transactions can write to the same resource
             try
             {
-                //TODO: Shall writeback before in memory pointer change???
-                shadows[context].WriteBackToDisk();
-
-                Interlocked.Exchange<TransactionStorage>(ref primary, shadows[context]);
-                shadows.Remove(context); 
+                lock (shadows)
+                {
+                    Interlocked.Exchange<TransactionStorage>(ref primary, shadows[context]);
+                    shadows.Remove(context);
+                }
+                primary.WriteBackToDisk();
             }
             catch (Exception)
             {
@@ -90,12 +98,13 @@ namespace MyRM
         /// <param name="context">Design for supporting multiple transactions</param>
         public static void Abort(Transaction context)
         {
-            // Now we only use the dummy context id (all 0s) because the TestBase.cs generates new transaction id before submitting the Car adds and Room add.
-            context.Id = Guid.Empty;
+
             try
             {
-
-                shadows.Remove(context);
+                lock (shadows)
+                {
+                    shadows.Remove(context);
+                }
             }
             catch (Exception)
             {
@@ -232,7 +241,6 @@ namespace MyRM
         /// <returns></returns>
         public Dictionary<Customer, HashSet<RID>> GetReservations()
         {
-
             return this.reservations;
         }
 
@@ -289,20 +297,19 @@ namespace MyRM
         /// </returns>
         private static TransactionStorage GetStorage(Transaction context)
         {
-            // TODO: implment lock on the transaction to make sure the content of primary is not changed when copying
             TransactionStorage storage;
-            // Now we only use the dummy context id (all 0s) because the TestBase.cs generates new transaction id before submitting the Car adds and Room add.
-            context.Id = Guid.Empty;
 
-            if (!primary.isInitialized)
+            lock (shadows)
             {
-                primary.Init();
+                if (!primary.isInitialized)
+                {
+                    primary.Init();
+                }
+                if (!shadows.TryGetValue(context, out storage))
+                {
+                    storage = primary;
+                }
             }
-            if (!shadows.TryGetValue(context, out storage))
-            {
-                storage = primary;
-            }
-
             return storage;
         }
 
@@ -314,33 +321,33 @@ namespace MyRM
         /// <returns>the shadow copy of the database</returns>
         private static TransactionStorage CreateShadowIfNotExists(Transaction context)
         {
-            // TODO: implment lock on the transaction to make sure the content of primary is not changed when copying
-            // Now we only use the dummy context id (all 0s) because the TestBase.cs generates new transaction id before submitting the Car adds and Room add.
-            context.Id = Guid.Empty;
             if (!primary.isInitialized)
             {
                 primary.Init();
             }
 
+
             TransactionStorage shadow;
             if (!shadows.TryGetValue(context, out shadow))
-            {
+            {                
                 // create new shadow if there is none for the context and copy the contents in primary to shadow
                 shadow = new TransactionStorage();
-
-                shadows.Add(context, shadow);
-                shadow.reservations = new Dictionary<Customer, HashSet<RID>>(primary.reservations.Count);
-                foreach (KeyValuePair<Customer, HashSet<RID>> item in primary.reservations)
+                lock (shadows)
                 {
-                    HashSet<RID> newSet = new HashSet<RID>(item.Value);
-                    shadow.reservations.Add(item.Key, newSet);
-                }
+                    shadows.Add(context, shadow);
+                    shadow.reservations = new Dictionary<Customer, HashSet<RID>>(primary.reservations.Count);
+                    foreach (KeyValuePair<Customer, HashSet<RID>> item in primary.reservations)
+                    {
+                        HashSet<RID> newSet = new HashSet<RID>(item.Value);
+                        shadow.reservations.Add(item.Key, newSet);
+                    }
 
-                shadow.resources = new Dictionary<RID, Resource>(primary.resources.Count);
-                foreach (KeyValuePair<RID, Resource> item in primary.resources)
-                {
-                    Resource newRes = new Resource(item.Key, item.Value.getCount(), item.Value.getPrice());
-                    shadow.resources.Add(item.Key, newRes);
+                    shadow.resources = new Dictionary<RID, Resource>(primary.resources.Count);
+                    foreach (KeyValuePair<RID, Resource> item in primary.resources)
+                    {
+                        Resource newRes = new Resource(item.Key, item.Value.getCount(), item.Value.getPrice());
+                        shadow.resources.Add(item.Key, newRes);
+                    }
                 }
             }
 
