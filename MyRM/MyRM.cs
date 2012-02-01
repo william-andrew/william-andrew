@@ -1,10 +1,9 @@
 using System;
-using System.Collections;
-using TP;
 using System.Collections.Generic;
-using System.Text;
-using System.Runtime.Remoting.Channels.Http;
 using System.Runtime.Remoting.Channels;
+using System.Runtime.Remoting.Channels.Http;
+using System.Text;
+using TP;
 namespace MyRM
 {
     /// <summary>
@@ -13,6 +12,9 @@ namespace MyRM
     public class MyRM : System.MarshalByRefObject, TP.RM
     {
         MyLM lockManager;
+        private TransactionStorage TransactionStorage;
+        private Database database;
+
         private string name;
 
         static TP.TM transactionManager = null;
@@ -76,6 +78,7 @@ namespace MyRM
         public void SetName(string _name)
         {
             name = _name;
+            InitStorage();
         }
 
         public string GetName()
@@ -529,6 +532,10 @@ namespace MyRM
 
         protected void InitStorage()
         {
+            database = new Database("MYRM_" + name);
+            database.CreateTable(Constants.ReservationTableName);
+            database.CreateTable(Constants.ResourcesTableName);
+            TransactionStorage = new TransactionStorage(database);            
             // TODO create database files, transaction logs
         }
 

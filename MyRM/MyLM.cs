@@ -21,7 +21,6 @@ namespace MyRM
             deadlockTimeout = DEFAULT_DEADLOCK_TIMEOUT;
         }
 
-
         // Useful if throwing exceptions when the resource is locked
         public class ResourceLocked : System.Exception
         {

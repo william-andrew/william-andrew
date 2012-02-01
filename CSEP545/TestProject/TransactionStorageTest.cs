@@ -13,7 +13,8 @@ namespace TestProject
         public void SetReservationsTest()
         {
             var customer = new Customer {Id = Guid.NewGuid()};
-            var target = new TransactionStorage_Accessor();
+            var db = CreateDatabase();
+            var target = new TransactionStorage(db);
             var reservations = new Dictionary<Customer, HashSet<RID>>
                                                                   {
                                                                       {
@@ -39,7 +40,8 @@ namespace TestProject
         [TestMethod]
         public void SetResourcesTest()
         {
-            var target = new TransactionStorage_Accessor();
+            var db = CreateDatabase();
+            var target = new TransactionStorage(db);
             var resources = new Dictionary<RID, Resource>();
             var rid1 = new RID(TP.RID.Type.ROOM, "Motel6");
             resources.Add(rid1, new Resource(rid1, 1000, 20));
@@ -58,13 +60,6 @@ namespace TestProject
             //Assert.AreEqual("53", result[rid2].getName());
         }
 
-        [TestCleanup()]
-        public void Cleanup()
-        {
-            TransactionStorage_Accessor tr = new TransactionStorage_Accessor();
-            TransactionStorage_Accessor.CleanUp();
-        }
-
         /// <summary>
         ///A test for Abort
         /// Also test that write is write to shadow and the read from this transaction will get the new value
@@ -73,13 +68,14 @@ namespace TestProject
         public void AbortTest()
         {
             Transaction context = new Transaction();
-            Transaction context1 = new Transaction();
             RID rid = new RID(RID.Type.FLIGHT, "test");
-            TransactionStorage.Write(context, rid, new Resource(rid, 10, 11));
-            Resource res = TransactionStorage.Read(context, rid);
+            var db = CreateDatabase();
+            TransactionStorage tr = new TransactionStorage(db);
+            tr.Write(context, rid, new Resource(rid, 10, 11));
+            Resource res = tr.Read(context, rid);
             Assert.AreEqual(11, res.getPrice());
-            TransactionStorage.Abort(context);
-            res = TransactionStorage.Read(context, rid);
+            tr.Abort(context);
+            res = tr.Read(context, rid);
             Assert.IsNull(res);
         }
 
@@ -93,11 +89,13 @@ namespace TestProject
             Transaction context = new Transaction();
             Transaction context1 = new Transaction();
             RID rid = new RID(RID.Type.FLIGHT, "test");
-            TransactionStorage.Write(context, rid, new Resource(rid, 10, 11));
-            Resource res = TransactionStorage.Read(context1, rid);
+            var db = CreateDatabase();
+            TransactionStorage tr = new TransactionStorage(db);
+            tr.Write(context, rid, new Resource(rid, 10, 11));
+            Resource res = tr.Read(context1, rid);
             Assert.IsNull(res);
-            TransactionStorage.Commit(context);
-            res = TransactionStorage.Read(context, rid);
+            tr.Commit(context);
+            res = tr.Read(context, rid);
             Assert.AreEqual(11, res.getPrice());
         }
 
@@ -110,9 +108,11 @@ namespace TestProject
         {
             Transaction context = new Transaction();
             RID rid = new RID(RID.Type.FLIGHT, "test");
-            TransactionStorage.Write(context, rid, new Resource(rid, 10, 11));
-            TransactionStorage.Delete(context, rid);
-            Resource res = TransactionStorage.Read(context, rid);
+            var db = CreateDatabase();
+            TransactionStorage tr = new TransactionStorage(db);
+            tr.Write(context, rid, new Resource(rid, 10, 11));
+            tr.Delete(context, rid);
+            Resource res = tr.Read(context, rid);
             Assert.IsNull(res);
         }
 
@@ -128,9 +128,11 @@ namespace TestProject
             Customer c = new Customer();
             HashSet<RID> reservations = new HashSet<RID>();
             reservations.Add(rid);
-            TransactionStorage.Write(context, c, reservations);
-            TransactionStorage.Delete(context, c);
-            List<Customer> cs = new List<Customer>(TransactionStorage.GetCustomers(context));
+            var db = CreateDatabase();
+            TransactionStorage tr = new TransactionStorage(db);
+            tr.Write(context, c, reservations);
+            tr.Delete(context, c);
+            List<Customer> cs = new List<Customer>(tr.GetCustomers(context));
             Assert.AreEqual(0, cs.Count);
         }
 
@@ -145,10 +147,20 @@ namespace TestProject
             Customer c = new Customer();
             HashSet<RID> reservations = new HashSet<RID>();
             reservations.Add(rid);
-            TransactionStorage.Write(context, c, reservations);
+            var db = CreateDatabase();
+            TransactionStorage tr = new TransactionStorage(db);
+            tr.Write(context, c, reservations);
             HashSet<RID> actual;
-            actual = TransactionStorage.Read(context, c);
+            actual = tr.Read(context, c);
             Assert.AreEqual(reservations, actual);
+        }
+
+        private IDatabase CreateDatabase()
+        {
+            var db = new Database("TEST_" + Guid.NewGuid());
+            db.CreateTable(Constants.ReservationTableName);
+            db.CreateTable(Constants.ResourcesTableName);
+            return db;
         }
     }
 }

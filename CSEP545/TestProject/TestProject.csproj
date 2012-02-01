@@ -51,7 +51,7 @@
     </CodeAnalysisDependentAssemblyPaths>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MyDatabaseTest.cs" />
+    <Compile Include="DatabaseTest.cs" />
     <Compile Include="MyLMTest.cs" />
     <Compile Include="MyRMTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

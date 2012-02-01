@@ -13,8 +13,6 @@ namespace MyRM
     [System.Serializable()]
     public class Resource
     {
-        private static readonly long serialVersionUID = 15980438631067294L;
-
         private RID rID;
         private int count;
         private int price;

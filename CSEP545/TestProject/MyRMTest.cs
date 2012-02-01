@@ -22,7 +22,7 @@ namespace TestProject
         /// <summary>
         ///A test for Add
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void AddTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -40,7 +40,7 @@ namespace TestProject
         /// <summary>
         ///A test for Commit
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void CommitTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -52,7 +52,7 @@ namespace TestProject
         /// <summary>
         ///A test for Delete
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void DeleteTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -68,7 +68,7 @@ namespace TestProject
         /// <summary>
         ///A test for Delete
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void DeleteTest1()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -85,7 +85,7 @@ namespace TestProject
         /// <summary>
         ///A test for Enlist
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void EnlistTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -97,7 +97,7 @@ namespace TestProject
         /// <summary>
         ///A test for ListCustomers
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void ListCustomersTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -112,7 +112,7 @@ namespace TestProject
         /// <summary>
         ///A test for ListResources
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void ListResourcesTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -128,7 +128,7 @@ namespace TestProject
         /// <summary>
         ///A test for Query
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void QueryTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -144,7 +144,7 @@ namespace TestProject
         /// <summary>
         ///A test for QueryPrice
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void QueryPriceTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -160,7 +160,7 @@ namespace TestProject
         /// <summary>
         ///A test for QueryReserved
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void QueryReservedTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -176,7 +176,7 @@ namespace TestProject
         /// <summary>
         ///A test for QueryReservedPrice
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void QueryReservedPriceTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -192,7 +192,7 @@ namespace TestProject
         /// <summary>
         ///A test for Reserve
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void ReserveTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -209,7 +209,7 @@ namespace TestProject
         /// <summary>
         ///A test for SelfDestruct
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void SelfDestructTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -221,7 +221,7 @@ namespace TestProject
         /// <summary>
         ///A test for Shutdown
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void ShutdownTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
@@ -232,7 +232,7 @@ namespace TestProject
         /// <summary>
         ///A test for UnReserve
         ///</summary>
-        [TestMethod()]
+        //[TestMethod()]
         public void UnReserveTest()
         {
             MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
