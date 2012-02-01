@@ -23,8 +23,7 @@ namespace TestProject
             var success = wc.AddSeats(context, "FL", 100, 550);
 
             tm.Commit(context);
-            
-
+          
         }
     }
 }

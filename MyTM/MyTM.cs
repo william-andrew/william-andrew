@@ -47,6 +47,11 @@ namespace MyTM
 	    /// <param name="context"></param>
 	    public void Commit(TP.Transaction context)
 	    {
+            foreach (RM rm in resourceManagers)
+            {
+                rm.Commit(context);
+            }
+            
 		    System.Console.WriteLine(string.Format("Transaction {0} commited", context.Id));
 	    }
 
@@ -90,7 +95,13 @@ namespace MyTM
             }
         }
 
-        public void shutdown() 
+        //TODO: REFACTOR THIS FOR TESTING
+        public void Register(TP.RM rm)
+        {
+            resourceManagers.Add(rm);
+        }
+
+	    public void shutdown() 
         {
             // TODO DO PROPER SHUTDOWN HERE
         }

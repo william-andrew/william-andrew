@@ -3,8 +3,6 @@ using System;
 using System.Text;
 using System.Collections.Generic;
 using System.Runtime.Remoting.Channels.Http;
-using System.Collections.Specialized;
-using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting;
 
 namespace MyWC
@@ -17,11 +15,10 @@ namespace MyWC
         /// <summary>
         /// Resource Manager for each resource type
         /// </summary>
-        static TP.RM Flights;
+        public static TP.RM Flights { get; set; }
         static TP.RM Rooms;
         static TP.RM Cars;
         static TP.TM TransactionManager;
-
 
         /// <param name="c">Customer</param>
         /// <param name="flights">array of flight names</param>
@@ -234,14 +231,14 @@ namespace MyWC
         public void Commit(Transaction context)
         {
             // TODO Auto-generated method stub
-
+            TransactionManager.Commit(context);
         }
 
 
         public void Abort(Transaction context)
         {
             // TODO Auto-generated method stub
-
+            TransactionManager.Abort(context);
         }
 
 
@@ -249,7 +246,6 @@ namespace MyWC
         {
 
         }
-
 
         protected void InitStorage()
         {
