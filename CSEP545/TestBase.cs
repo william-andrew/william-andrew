@@ -27,6 +27,7 @@ namespace CSEP545
             Customer c = new Customer();
             wc.AddCars(t,"Car1", 1, 1);
             wc.AddRooms(t, "Room1", 2, 1);
+            wc.Commit(t);
             string[] flights = new string[0];
             wc.ReserveItinerary(c,flights,"Room1",false,true);
             Console.WriteLine(wc.QueryItinerary(t,c));

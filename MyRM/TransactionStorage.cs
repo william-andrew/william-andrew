@@ -44,22 +44,15 @@ namespace MyRM
             // TODO: make it commit only the changed pages
             // TODO: Make sure pages written by other transactions get updated in this shadow before this shadow is commited. 
             // Making dirty record is enough for this operation because lockmanager ensures no other transactions can write to the same resource
-            try
+            lock (_shadows)
             {
-                lock (_shadows)
+                if (_shadows.ContainsKey(context))
                 {
                     Interlocked.Exchange(ref _primary, _shadows[context]);
                     _shadows.Remove(context);
                 }
-                WriteBackToDisk();
             }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                // catch all exceptions here because if the same transaction is commited twice, 
-                // the second commit may throw exception. It is ok to catch it because the 
-                // commit is actually successful. 
-            }
+            WriteBackToDisk();
         }
 
         /// <summary>
