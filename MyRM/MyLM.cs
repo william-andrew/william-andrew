@@ -273,6 +273,12 @@ namespace MyRM
                 // Get exclusive access to the resource
                 lock (lockTarget)
                 {
+                    // return if the lock is already registered for this transaction
+                    if (lockTarget.HasLock(context, mode))
+                    {
+                        return;
+                    }
+
                     // Set the lock, if you can
                     if (lockTarget.Compatible(mode))
                     {

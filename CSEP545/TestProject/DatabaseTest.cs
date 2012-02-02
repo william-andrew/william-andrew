@@ -4,6 +4,39 @@ using MyRM;
 
 namespace TestProject
 {
+    public class MockDatabase:IDatabase
+    {
+
+        public void CreateTable(string tableName)
+        {
+        }
+
+        public string DatabaseName
+        {
+            get { return "test"; }
+        }
+
+        public void Initialize(bool autoRecovery = true)
+        {
+           
+        }
+
+        public bool ContainsTable(string tableName)
+        {
+            return true;
+        }
+
+        public string ReadTable(string tableName)
+        {
+            return string.Empty;
+        }
+
+        public void WriteTable(string tableName, string data)
+        {
+            
+        }
+    }
+
    [TestClass]
     public class DatabaseTest
     {

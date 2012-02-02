@@ -13,7 +13,7 @@ namespace MyRM
     {
         MyLM lockManager;
         private TransactionStorage TransactionStorage;
-        private Database database;
+        private IDatabase database;
 
         private string name;
 
@@ -253,9 +253,9 @@ namespace MyRM
             {
                 foreach (Customer c in TransactionStorage.GetCustomers(context))
                 {
+                    lockManager.LockForWrite(context, c);
                     HashSet<RID> e = TransactionStorage.Read(context, c);
                     e.Remove(rid);
-                    TransactionStorage.Write(context, c, e);
                 }
             }
 

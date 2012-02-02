@@ -15,71 +15,69 @@ namespace TestProject
         [TestCleanup()]
         public void Cleanup()
         {
-            MyRM.MyRM target = new MyRM.MyRM(); 
-            
+            MyRM.MyRM target = new MyRM.MyRM();
+            target.SetName("test");
         }
 
         /// <summary>
         ///A test for Add
         ///</summary>
-        //[TestMethod()]
+        [TestMethod()]
         public void AddTest()
         {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            RID i = null; // TODO: Initialize to an appropriate value
-            int count = 0; // TODO: Initialize to an appropriate value
-            int price = 0; // TODO: Initialize to an appropriate value
-            bool expected = false; // TODO: Initialize to an appropriate value
-            bool actual;
-            actual = target.Add(context, i, count, price);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
+            MyRM.MyRM_Accessor target = MockRM();
+            Transaction context = new Transaction(); 
+            RID i = new RID(RID.Type.ROOM, "test1");
+            int count = 1; 
+            int price = 3; 
+            target.Add(context, i, count, price);
+            Assert.AreEqual(price, target.QueryPrice(context, i));
         }
 
         /// <summary>
         ///A test for Commit
+        /// also test QueryPrice
         ///</summary>
-        //[TestMethod()]
+        [TestMethod()]
         public void CommitTest()
         {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
+            MyRM.MyRM_Accessor target = MockRM();
+            target.SetName("test");
+            Transaction context = new Transaction();
+            Transaction context1 = new Transaction();
+            RID i = new RID(RID.Type.ROOM, "test1");
+            int count = 1;
+            int price = 3;
+            target.Add(context, i, count, price);
             target.Commit(context);
-            Assert.Inconclusive("A method that does not return a value cannot be verified.");
+            Assert.AreEqual(price, target.QueryPrice(context1, i));
         }
 
         /// <summary>
-        ///A test for Delete
+        ///A test for Delete,
+        /// also test Query, Reserve, QueryReservedPrice, QueryReserved
         ///</summary>
-        //[TestMethod()]
+        [TestMethod()]
+        [ExpectedException(typeof(ArgumentException))]
         public void DeleteTest()
         {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            RID rid = null; // TODO: Initialize to an appropriate value
-            bool expected = false; // TODO: Initialize to an appropriate value
-            bool actual;
-            actual = target.Delete(context, rid);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
-        }
-
-        /// <summary>
-        ///A test for Delete
-        ///</summary>
-        //[TestMethod()]
-        public void DeleteTest1()
-        {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            RID rid = null; // TODO: Initialize to an appropriate value
-            int count = 0; // TODO: Initialize to an appropriate value
-            bool expected = false; // TODO: Initialize to an appropriate value
-            bool actual;
-            actual = target.Delete(context, rid, count);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
+            MyRM.MyRM_Accessor target = MockRM();
+            target.SetName("test");
+            Transaction context = new Transaction();
+            Customer c = new Customer();
+            RID rid = new RID(RID.Type.ROOM, "test1");
+            int count = 5;
+            int price = 3;
+            Assert.IsFalse(target.Delete(context, rid));
+            target.Add(context, rid, count, price);
+            target.Delete(context, rid, 2);
+            Assert.AreEqual(3, target.Query(context, rid));
+            target.Reserve(context, c, rid);
+            target.Delete(context, rid);
+            Assert.AreEqual(0, target.QueryReservedPrice(context, c));
+            Assert.IsTrue(string.IsNullOrEmpty(target.QueryReserved(context, c)));
+            target.Query(context, rid);
+            Assert.Fail("shall not hit this line.");
         }
 
         /// <summary>
@@ -88,122 +86,10 @@ namespace TestProject
         //[TestMethod()]
         public void EnlistTest()
         {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
+            MyRM.MyRM_Accessor target = MockRM();
             Transaction context = null; // TODO: Initialize to an appropriate value
             target.Enlist(context);
             Assert.Inconclusive("A method that does not return a value cannot be verified.");
-        }
-
-        /// <summary>
-        ///A test for ListCustomers
-        ///</summary>
-        //[TestMethod()]
-        public void ListCustomersTest()
-        {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            Customer[] expected = null; // TODO: Initialize to an appropriate value
-            Customer[] actual;
-            actual = target.ListCustomers(context);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
-        }
-
-        /// <summary>
-        ///A test for ListResources
-        ///</summary>
-        //[TestMethod()]
-        public void ListResourcesTest()
-        {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            RID.Type type = new RID.Type(); // TODO: Initialize to an appropriate value
-            string[] expected = null; // TODO: Initialize to an appropriate value
-            string[] actual;
-            actual = target.ListResources(context, type);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
-        }
-
-        /// <summary>
-        ///A test for Query
-        ///</summary>
-        //[TestMethod()]
-        public void QueryTest()
-        {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            RID rid = null; // TODO: Initialize to an appropriate value
-            int expected = 0; // TODO: Initialize to an appropriate value
-            int actual;
-            actual = target.Query(context, rid);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
-        }
-
-        /// <summary>
-        ///A test for QueryPrice
-        ///</summary>
-        //[TestMethod()]
-        public void QueryPriceTest()
-        {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            RID rid = null; // TODO: Initialize to an appropriate value
-            int expected = 0; // TODO: Initialize to an appropriate value
-            int actual;
-            actual = target.QueryPrice(context, rid);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
-        }
-
-        /// <summary>
-        ///A test for QueryReserved
-        ///</summary>
-        //[TestMethod()]
-        public void QueryReservedTest()
-        {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            Customer customer = null; // TODO: Initialize to an appropriate value
-            string expected = string.Empty; // TODO: Initialize to an appropriate value
-            string actual;
-            actual = target.QueryReserved(context, customer);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
-        }
-
-        /// <summary>
-        ///A test for QueryReservedPrice
-        ///</summary>
-        //[TestMethod()]
-        public void QueryReservedPriceTest()
-        {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            Customer customer = null; // TODO: Initialize to an appropriate value
-            int expected = 0; // TODO: Initialize to an appropriate value
-            int actual;
-            actual = target.QueryReservedPrice(context, customer);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
-        }
-
-        /// <summary>
-        ///A test for Reserve
-        ///</summary>
-        //[TestMethod()]
-        public void ReserveTest()
-        {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            Customer c = null; // TODO: Initialize to an appropriate value
-            RID i = null; // TODO: Initialize to an appropriate value
-            bool expected = false; // TODO: Initialize to an appropriate value
-            bool actual;
-            actual = target.Reserve(context, c, i);
-            Assert.AreEqual(expected, actual);
-            Assert.Inconclusive("Verify the correctness of this test method.");
         }
 
         /// <summary>
@@ -212,7 +98,7 @@ namespace TestProject
         //[TestMethod()]
         public void SelfDestructTest()
         {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
+            MyRM.MyRM_Accessor target = MockRM();
             int diskWritesToWait = 0; // TODO: Initialize to an appropriate value
             target.SelfDestruct(diskWritesToWait);
             Assert.Inconclusive("A method that does not return a value cannot be verified.");
@@ -232,14 +118,32 @@ namespace TestProject
         /// <summary>
         ///A test for UnReserve
         ///</summary>
-        //[TestMethod()]
+        [TestMethod()]
         public void UnReserveTest()
         {
-            MyRM.MyRM target = new MyRM.MyRM(); // TODO: Initialize to an appropriate value
-            Transaction context = null; // TODO: Initialize to an appropriate value
-            Customer c = null; // TODO: Initialize to an appropriate value
+            MyRM.MyRM_Accessor target = MockRM();
+            Transaction context = new Transaction();
+            Customer c = new Customer();
+            RID rid = new RID(RID.Type.ROOM, "test1");
+            RID rid1 = new RID(RID.Type.CAR, "test1");
+            int count = 5;
+            int price = 3;
+            Assert.IsFalse(target.Delete(context, rid));
+            target.Add(context, rid, count, price);
+            target.Add(context, rid1, count, price);
+            target.Reserve(context, c, rid);
+            Assert.AreEqual(count, target.Query(context, rid1));
+            Assert.AreEqual(count - 1, target.Query(context, rid));
             target.UnReserve(context, c);
-            Assert.Inconclusive("A method that does not return a value cannot be verified.");
+            Assert.AreEqual(count, target.Query(context, rid1));
+            Assert.AreEqual(count, target.Query(context, rid));
+        }
+
+        private MyRM.MyRM_Accessor MockRM()
+        {
+            MyRM.MyRM_Accessor accessor = new MyRM_Accessor();
+            accessor.TransactionStorage = new TransactionStorage(new MockDatabase());      
+            return accessor;
         }
     }
 }

@@ -34,6 +34,7 @@ namespace TestProject
 
         /// <summary>
         ///A test for LockForRead
+        /// Also test LockForWrite if lock twice on the same context the same resource
         ///</summary>
         [TestMethod()]
         [ExpectedException(typeof(MyLM.DeadLockDetected))]
@@ -47,10 +48,11 @@ namespace TestProject
             target.setDeadlockTimeout(10);
             target.LockForRead(context, resource);
             target.LockForWrite(context2, resource);
+            target.LockForWrite(context2, resource);
         }
 
         /// <summary>
-        ///A test for LockForWrite
+        ///A test for LockForWrite for different transactions and create deadlock
         ///</summary>
         [TestMethod()]
         [ExpectedException(typeof(MyLM.DeadLockDetected))]
