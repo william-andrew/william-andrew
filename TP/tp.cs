@@ -412,5 +412,12 @@ namespace TP
         /// <param name="context"></param>
         /// <param name="rm"></param>
         void NotifyCommit(Transaction context);
+
+        /// <summary>
+        /// For TM to call RM to abort.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="rm"></param>
+        void NotifyAbort(Transaction context);
     }
 }

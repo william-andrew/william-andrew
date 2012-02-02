@@ -565,5 +565,11 @@ namespace MyRM
         {
             throw new NotImplementedException();
         }
+
+
+        public void NotifyAbort(Transaction context)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
