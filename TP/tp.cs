@@ -210,7 +210,21 @@ namespace TP
 		/// </summary>
 		/// <param name="rm"></param>
         void Register(string rm);
-	}
+
+        /// <summary>
+        /// For rm to call to tell TM that RM is prepared.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="rm"></param>
+        void OnRmPrepared(Transaction context, string rm);
+    
+        /// <summary>
+        /// For rm to call to tell TM that RM is done.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="rm"></param>
+        void OnRmDone(Transaction context, string rm);
+    }
 
 	/// <summary>
 	/*   Workflow controller interface */
@@ -384,5 +398,19 @@ namespace TP
 		/// </summary>
 		/// <param name="diskWritesToWait"></param>
 		void SelfDestruct(int diskWritesToWait);
-	}
+
+        /// <summary>
+        /// For TM to call RM to get prepare.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="rm"></param>
+        void NofifyPrepare(Transaction context);
+
+        /// <summary>
+        /// For TM to call RM to get done.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="rm"></param>
+        void NotifyCommit(Transaction context);
+    }
 }

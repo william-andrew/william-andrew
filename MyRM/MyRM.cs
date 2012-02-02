@@ -554,5 +554,16 @@ namespace MyRM
 
 
 
+
+
+        public void NofifyPrepare(Transaction context)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void NotifyCommit(Transaction context)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

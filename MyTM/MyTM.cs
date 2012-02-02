@@ -173,5 +173,16 @@ namespace MyTM
             }
         }
 
-}
+
+
+        public void OnRmPrepared(Transaction context, string rm)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void OnRmDone(Transaction context, string rm)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }
