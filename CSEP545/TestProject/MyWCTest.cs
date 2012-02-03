@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Transaction = TP.Transaction;
+using System.Linq;
 
 namespace TestProject
 {
@@ -9,7 +10,7 @@ namespace TestProject
         /// <summary>
         ///A test for AddSeats
         ///</summary>
-        [TestMethod()]
+        [TestMethod]
         public void AddSeatsTest()
         {
             var wc = new MyWC.MyWC();
@@ -18,12 +19,249 @@ namespace TestProject
             rm.SetName("flight");
             tm.Register(rm);
             MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
- 
-            var context = new Transaction();
-            var success = wc.AddSeats(context, "FL", 100, 550);
 
+            var context = new Transaction();
+            wc.AddSeats(context, "FL", 100, 550);
+            wc.AddSeats(context, "SG", 200, 250);
             tm.Commit(context);
-          
+
+            context = new Transaction();
+            var result = wc.ListFlights(context);
+            tm.Commit(context);
+            Assert.AreEqual(2, result.Length);
+
+            context = new Transaction();
+            wc.AddSeats(context, "FL", 50, 450);
+            tm.Commit(context);
+
+            context = new Transaction();
+            var c = wc.QueryFlight(context, "FL");
+            Assert.AreEqual(150, c);
+            var price = wc.QueryFlightPrice(context, "FL");
+            Assert.AreEqual(450, price);
+            tm.Abort(context);
+
+            context = new Transaction();
+            c = wc.QueryFlight(context, "SG");
+            price = wc.QueryFlightPrice(context, "SG");
+            Assert.AreEqual(200, c);
+            Assert.AreEqual(250, price);
+            tm.Abort(context);
+        }
+
+        /// <summary>
+        ///A test for DeleteSeats
+        ///</summary>
+        [TestMethod]
+        public void DeleteSeatsTest()
+        {
+            var wc = new MyWC.MyWC();
+            var tm = new MyTM.MyTM();
+            var rm = new MyRM.MyRM();
+            rm.SetName("flight");
+            tm.Register(rm);
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+
+            var context = new Transaction();
+            var flights = wc.ListFlights(context);
+            foreach(var f in flights)
+            {
+                wc.DeleteFlight(context, f.Split(',')[0]);
+            }
+            tm.Commit(context);
+
+            Assert.IsTrue(wc.AddSeats(context, "FLX", 100, 550));
+            Assert.IsTrue(wc.AddSeats(context, "SGX", 200, 250));
+            tm.Commit(context);
+
+            context = new Transaction();
+            var result = wc.ListFlights(context);
+            tm.Commit(context);
+            Assert.AreEqual(2, result.Length);
+
+            context = new Transaction();
+            Assert.IsTrue(wc.DeleteSeats(context, "FLX", 50));
+            Assert.IsTrue(wc.DeleteSeats(context, "SGX", 50));
+            tm.Commit(context);
+
+            context = new Transaction();
+            var c1 = wc.QueryFlight(context, "FLX");
+            var c2 = wc.QueryFlight(context, "SGX");
+            Assert.AreEqual(100 - 50, c1);
+            Assert.AreEqual(200 - 50, c2);
+            tm.Abort(context);
+        }
+
+        /// <summary>
+        ///A test for DeleteFlight
+        ///</summary>
+        [TestMethod]
+        public void DeleteFlight()
+        {
+            var wc = new MyWC.MyWC();
+            var tm = new MyTM.MyTM();
+            var rm = new MyRM.MyRM();
+            rm.SetName("flight");
+            tm.Register(rm);
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+
+            var context = new Transaction();
+            Assert.IsTrue(wc.AddSeats(context, "FLK", 100, 550));
+            tm.Commit(context);
+
+            context = new Transaction();
+            var result = wc.ListFlights(context);
+            tm.Commit(context);
+
+            Assert.IsTrue((from f in result where f == "FLK,100,550" select f).Any());
+
+            context = new Transaction();
+            Assert.IsTrue(wc.DeleteFlight(context, "FLK"));
+            result = wc.ListFlights(context);
+            tm.Commit(context);
+
+            Assert.IsFalse((from f in result where f == "FLK,100,550" select f).Any());
+        }
+
+        /// <summary>
+        ///A test for AddRooms/DeleteRooms/QueryRoom/QueryRoomPrice
+        ///</summary>
+        [TestMethod]
+        public void AddDeleteRooms()
+        {
+            var wc = new MyWC.MyWC();
+            var tm = new MyTM.MyTM();
+            var rm = new MyRM.MyRM();
+            rm.SetName("room");
+            tm.Register(rm);
+            MyWC.MyWC.Rooms = tm.GetResourceMananger("room");
+
+            var context = new Transaction();
+            Assert.IsTrue(wc.AddRooms(context, "SEATTLE", 100, 66));
+            Assert.IsTrue(wc.AddRooms(context, "BEIJING", 200, 220));
+            tm.Commit(context);
+
+            context = new Transaction();
+            Assert.AreEqual(100, wc.QueryRoom(context, "SEATTLE"));
+            Assert.AreEqual(66, wc.QueryRoomPrice(context, "SEATTLE"));
+
+            Assert.AreEqual(200, wc.QueryRoom(context, "BEIJING"));
+            Assert.AreEqual(220, wc.QueryRoomPrice(context, "BEIJING"));
+            tm.Commit(context);
+
+            //add rooms
+            context = new Transaction();
+            Assert.IsTrue(wc.AddRooms(context, "SEATTLE", 10, 55));
+            Assert.IsTrue(wc.AddRooms(context, "BEIJING", 20, 110));
+            tm.Commit(context);
+
+            context = new Transaction();
+            Assert.AreEqual(100 + 10, wc.QueryRoom(context, "SEATTLE"));
+            Assert.AreEqual(55, wc.QueryRoomPrice(context, "SEATTLE"));
+
+            Assert.AreEqual(220, wc.QueryRoom(context, "BEIJING"));
+            Assert.AreEqual(110, wc.QueryRoomPrice(context, "BEIJING"));
+            tm.Commit(context);
+
+            //delete rooms
+            context = new Transaction();
+            Assert.IsTrue(wc.DeleteRooms(context, "SEATTLE", 5));
+            Assert.IsTrue(wc.DeleteRooms(context, "BEIJING", 10));
+            tm.Commit(context);
+
+            context = new Transaction();
+            Assert.AreEqual(100 + 10 - 5, wc.QueryRoom(context, "SEATTLE"));
+            Assert.AreEqual(55, wc.QueryRoomPrice(context, "SEATTLE"));
+            
+            Assert.AreEqual(220 - 10, wc.QueryRoom(context, "BEIJING"));
+            Assert.AreEqual(110, wc.QueryRoomPrice(context, "BEIJING"));
+            tm.Commit(context);
+        }
+
+        /// <summary>
+        ///A test for AddCars/DeleteCars/QueryCar/QueryCarPrice
+        ///</summary>
+        [TestMethod]
+        public void AddDeleteCars()
+        {
+            var wc = new MyWC.MyWC();
+            var tm = new MyTM.MyTM();
+            var rm = new MyRM.MyRM();
+            rm.SetName("car");
+            tm.Register(rm);
+            MyWC.MyWC.Cars = tm.GetResourceMananger("car");
+
+            var context = new Transaction();
+            Assert.IsTrue(wc.AddCars(context, "SEATTLE", 100, 66));
+            Assert.IsTrue(wc.AddCars(context, "BEIJING", 200, 220));
+            tm.Commit(context);
+
+            context = new Transaction();
+            Assert.AreEqual(100, wc.QueryCar(context, "SEATTLE"));
+            Assert.AreEqual(66, wc.QueryCarPrice(context, "SEATTLE"));
+
+            Assert.AreEqual(200, wc.QueryCar(context, "BEIJING"));
+            Assert.AreEqual(220, wc.QueryCarPrice(context, "BEIJING"));
+            tm.Commit(context);
+
+            //add rooms
+            context = new Transaction();
+            Assert.IsTrue(wc.AddCars(context, "SEATTLE", 10, 55));
+            Assert.IsTrue(wc.AddCars(context, "BEIJING", 20, 110));
+            tm.Commit(context);
+
+            context = new Transaction();
+            Assert.AreEqual(100 + 10, wc.QueryCar(context, "SEATTLE"));
+            Assert.AreEqual(55, wc.QueryCarPrice(context, "SEATTLE"));
+
+            Assert.AreEqual(220, wc.QueryCar(context, "BEIJING"));
+            Assert.AreEqual(110, wc.QueryCarPrice(context, "BEIJING"));
+            tm.Commit(context);
+
+            //delete rooms
+            context = new Transaction();
+            Assert.IsTrue(wc.DeleteCars(context, "SEATTLE", 5));
+            Assert.IsTrue(wc.DeleteCars(context, "BEIJING", 10));
+            tm.Commit(context);
+
+            context = new Transaction();
+            Assert.AreEqual(100 + 10 - 5, wc.QueryCar(context, "SEATTLE"));
+            Assert.AreEqual(55, wc.QueryCarPrice(context, "SEATTLE"));
+
+            Assert.AreEqual(220 - 10, wc.QueryCar(context, "BEIJING"));
+            Assert.AreEqual(110, wc.QueryCarPrice(context, "BEIJING"));
+            tm.Commit(context);
+        }
+
+        /// <summary>
+        ///A test for Add/remove multiple resources in a transaction 
+        ///</summary>
+        [TestMethod]
+        public void AddDeleteCombinations()
+        {
+            var wc = new MyWC.MyWC();
+            var tm = new MyTM.MyTM();
+            var rmf = new MyRM.MyRM();
+            var rmc = new MyRM.MyRM();
+            var rmr = new MyRM.MyRM();
+
+            rmf.SetName("flight");
+            rmc.SetName("car");
+            rmr.SetName("room");
+
+            tm.Register(rmf);
+            tm.Register(rmc);
+            tm.Register(rmr);
+
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+            MyWC.MyWC.Cars = tm.GetResourceMananger("car");
+            MyWC.MyWC.Rooms = tm.GetResourceMananger("room");
+
+            var context = new Transaction();
+            wc.AddSeats(context, "SEA-JFK", 3000, 300);
+            wc.AddCars(context, "NY", 2000, 200);
+            wc.AddRooms(context, "NY", 1000, 100);
+            tm.Commit(context);
         }
     }
 }

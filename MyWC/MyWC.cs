@@ -16,9 +16,9 @@ namespace MyWC
         /// Resource Manager for each resource type
         /// </summary>
         public static TP.RM Flights { get; set; }
-        static TP.RM Rooms;
-        static TP.RM Cars;
-        static TP.TM TransactionManager;
+        public static TP.RM Rooms { get; set; }
+        public static TP.RM Cars { get; set; }
+        public static TP.TM TransactionManager { get; set; }
 
         /// <param name="c">Customer</param>
         /// <param name="flights">array of flight names</param>
