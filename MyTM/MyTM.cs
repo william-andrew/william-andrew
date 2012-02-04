@@ -34,6 +34,7 @@ namespace MyTM
             }
             return null;
         }
+
 		public TP.Transaction Start()
 		{
 			Transaction context = new Transaction();
@@ -64,13 +65,14 @@ namespace MyTM
 		    System.Console.WriteLine(string.Format("Transaction {0} aborted", context.Id));
 	    }
 
-	    /// <summary>
 	    /*  Called by RM.
 		    This method notifies TM that it is involved in a given transaction
 		    TM keeps track of which RM is enlisted with which transaction to do distributed transactions */
+	    /// <summary>
 	    /// </summary>
 	    /// <param name="context"></param>
-        public bool Enlist(TP.Transaction context, string enlistingRM)
+	    /// <param name="enlistingRM"> </param>
+	    public bool Enlist(TP.Transaction context, string enlistingRM)
 	    {
 		    System.Console.WriteLine(string.Format( "Transaction {0} enlisted", context.Id ));
             return false;
