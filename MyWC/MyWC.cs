@@ -57,7 +57,7 @@ namespace MyWC
                 Flights.Abort(tid);
                 Rooms.Abort(tid);
 
-                throw e;
+                throw;
             }
 
             return true;
@@ -223,21 +223,18 @@ namespace MyWC
 
         public Transaction Start()
         {
-            // TODO Auto-generated method stub
             return TransactionManager.Start();
         }
 
 
         public void Commit(Transaction context)
         {
-            // TODO Auto-generated method stub
             TransactionManager.Commit(context);
         }
 
 
         public void Abort(Transaction context)
         {
-            // TODO Auto-generated method stub
             TransactionManager.Abort(context);
         }
 
@@ -249,6 +246,7 @@ namespace MyWC
 
         protected void InitStorage()
         {
+
         }
 
         protected void Recovery()
@@ -269,12 +267,12 @@ namespace MyWC
         {
             public WCParser()
             {
-                
+
                 //Add("f", "Flights RM", "The URL of the Flights Resource Manager", "http://localhost:8081/RM.soap");
                 //Add("c", "Cars RM", "The URL of the Cars Resource Manager", "http://localhost:8082/RM.soap");
                 //Add( "r", "Rooms RM", "The URL of the Rooms Resource Manager", "http://localhost:8083/RM.soap");
-                Add("tms","trasaction manager server", "the server TM running on", "http://localhost");
-                Add("tmp","transaction manager port", "The port of the Transaction Manager", "8089");
+                Add("tms", "trasaction manager server", "the server TM running on", "http://localhost");
+                Add("tmp", "transaction manager port", "The port of the Transaction Manager", "8089");
                 Add("p", "Port", "The port this Workflow Controller listens on", "8086");
             }
         }
@@ -283,7 +281,7 @@ namespace MyWC
             waiting for the calls from other processes */
         /// </summary>
         static void Main(string[] args)
-        { 
+        {
             WCParser parser = new WCParser();
             if (!parser.Parse(args))
             {
@@ -313,11 +311,10 @@ namespace MyWC
                 }
             }
 
-            
             Console.WriteLine("Transaction Manager retrieved at {0}", tmURL);
             while (Flights == null || Rooms == null || Cars == null)
             {
-                if(Flights == null)
+                if (Flights == null)
                     Flights = TransactionManager.GetResourceMananger("flight");
                 if (Rooms == null)
                     Rooms = TransactionManager.GetResourceMananger("room");
@@ -333,15 +330,14 @@ namespace MyWC
 
             HttpChannel httpChannel = new HttpChannel(Int32.Parse(parser["p"]));
             System.Runtime.Remoting.Channels.ChannelServices.RegisterChannel(httpChannel, false);
-            System.Runtime.Remoting.RemotingConfiguration.RegisterWellKnownServiceType
+            RemotingConfiguration.RegisterWellKnownServiceType
                 (Type.GetType("MyWC.MyWC")							    // Assembly name
                 , "WC.soap"												// URI
                 , System.Runtime.Remoting.WellKnownObjectMode.Singleton	// Instancing mode
             );
 
-            Console.WriteLine("Staring Workflow Controller on port {0}", parser["p"]);
+            Console.WriteLine("Starting Workflow Controller on port {0}", parser["p"]);
 
-            
             while (true)
             {
                 System.Threading.Thread.Sleep(100000);

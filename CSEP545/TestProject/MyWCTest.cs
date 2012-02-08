@@ -328,5 +328,57 @@ namespace TestProject
             Assert.AreEqual(1000, wc.QueryRoom(context, "NY"));
             tm.Commit(context);
         }
+
+        /// <summary>
+        ///A test for Abort
+        ///</summary>
+        [TestMethod]
+        public void AddSeatsAbortTest()
+        {
+            var wc = new MyWC.MyWC();
+            var tm = new MyTM.MyTM();
+            var rm = new MyRM.MyRM();
+            rm.SetName("flight");
+            tm.Register(rm);
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+
+            var context = new Transaction();
+            wc.AddSeats(context, "FLK", 100, 550);
+            wc.AddSeats(context, "SGK", 200, 250);
+            tm.Abort(context);
+
+            context = new Transaction();
+            var result = wc.ListFlights(context);
+            tm.Commit(context);
+            Assert.IsFalse((from f in result where f == "FLK,100,550" select f).Any());
+            Assert.IsFalse((from f in result where f == "SGK,200,250" select f).Any());
+        }
+
+        /// <summary>
+        ///A test for AddSeats
+        ///</summary>
+        [TestMethod]
+        public void AddSeatsTwoTransactions()
+        {
+            var wc = new MyWC.MyWC();
+            var tm = new MyTM.MyTM();
+            var rm = new MyRM.MyRM();
+            rm.SetName("flight");
+            tm.Register(rm);
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+
+            var context1 = new Transaction();
+            var context2 = new Transaction();
+            wc.AddSeats(context1, "FL_C", 100, 550);
+            wc.AddSeats(context2, "SG_A", 200, 250);
+            tm.Abort(context2);
+            tm.Commit(context1);
+
+            context1 = new Transaction();
+            var result = wc.ListFlights(context1);
+            tm.Commit(context1);
+            Assert.IsTrue((from f in result where f == "FL_C,100,550" select f).Any());
+            Assert.IsFalse((from f in result where f == "SG_A,200,250" select f).Any());
+        }
     }
 }

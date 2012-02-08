@@ -1,16 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace CSEP545
+﻿namespace CSEP545
 {
     using System;
-    using System.Collections.Generic;
-    using System.Collections;
-    using System.Text;
-    using System.Threading;
     using System.Diagnostics;
+    using System.Threading;
     using TP;
 
     class MasterTest
@@ -23,15 +15,17 @@ namespace CSEP545
             TP.WC wc = (TP.WC)System.Activator.GetObject(typeof(RM), "http://localhost:8086/WC.soap");
             RM rmcars = (RM)System.Activator.GetObject(typeof(RM), "http://localhost:8082/RM.soap");
             RM rmrooms = (RM)System.Activator.GetObject(typeof(RM), "http://localhost:8083/RM.soap");
+
             Transaction t = wc.Start();
             Customer c = new Customer();
-            wc.AddCars(t,"Car1", 1, 1);
+            wc.AddCars(t, "Car1", 1, 1);
             wc.AddRooms(t, "Room1", 2, 1);
             wc.Commit(t);
+
             string[] flights = new string[0];
-            wc.ReserveItinerary(c,flights,"Room1",false,true);
-            Console.WriteLine(wc.QueryItinerary(t,c));
-            string [] rooms = wc.ListRooms(t);
+            wc.ReserveItinerary(c, flights, "Room1", false, true);
+            Console.WriteLine(wc.QueryItinerary(t, c));
+            string[] rooms = wc.ListRooms(t);
             foreach (string r in rooms)
                 Console.WriteLine(r);
             

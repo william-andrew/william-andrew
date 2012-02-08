@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-
-namespace CSEP545
+﻿namespace CSEP545
 {
     class Program
     {

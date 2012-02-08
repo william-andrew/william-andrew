@@ -9,18 +9,18 @@ using System.Collections.Generic;
 
 namespace MyTM
 {
-	/// <summary>
-	/*  Transaction Manager */
-	/// </summary>
-	public class MyTM: System.MarshalByRefObject, TP.TM
-	{
-
+    /// <summary>
+    /*  Transaction Manager */
+    /// </summary>
+    public class MyTM : System.MarshalByRefObject, TP.TM
+    {
         private HashSet<RM> resourceManagers;
-		public MyTM()
-		{
-			System.Console.WriteLine("Transaction Manager instantiated");
+
+        public MyTM()
+        {
+            System.Console.WriteLine("Transaction Manager instantiated");
             resourceManagers = new HashSet<RM>();
-		}
+        }
 
         public RM GetResourceMananger(string name)
         {
@@ -35,60 +35,64 @@ namespace MyTM
             return null;
         }
 
-		public TP.Transaction Start()
-		{
-			Transaction context = new Transaction();
-			System.Console.WriteLine( string.Format("TM: Transaction {0} started", context.Id));
-			return context;
-		}
- 
-	    /// <summary>
-	    //	 Call from WC in response to a client's commit
-	    /// </summary>
-	    /// <param name="context"></param>
-	    public void Commit(TP.Transaction context)
-	    {
+        public TP.Transaction Start()
+        {
+            Transaction context = new Transaction();
+            System.Console.WriteLine(string.Format("TM: Transaction {0} started", context.Id));
+            return context;
+        }
+
+        /// <summary>
+        //	 Call from WC in response to a client's commit
+        /// </summary>
+        /// <param name="context"></param>
+        public void Commit(TP.Transaction context)
+        {
             foreach (RM rm in resourceManagers)
             {
                 rm.Commit(context);
             }
-            
-		    System.Console.WriteLine(string.Format("Transaction {0} commited", context.Id));
-	    }
+            System.Console.WriteLine(string.Format("Transaction {0} commited", context.Id));
+        }
 
-	    /// <summary>
-	    // Call from WC in response to a client's abort
-	    /// </summary>
-	    /// <param name="context"></param>
-	    public void Abort(TP.Transaction context)
-	    {
-		    System.Console.WriteLine(string.Format("Transaction {0} aborted", context.Id));
-	    }
+        /// <summary>
+        // Call from WC in response to a client's abort
+        /// </summary>
+        /// <param name="context"></param>
+        public void Abort(TP.Transaction context)
+        {
+            foreach (RM rm in resourceManagers)
+            {
+                rm.Abort(context);
+            }
+            System.Console.WriteLine(string.Format("Transaction {0} aborted", context.Id));
+        }
 
-	    /*  Called by RM.
-		    This method notifies TM that it is involved in a given transaction
-		    TM keeps track of which RM is enlisted with which transaction to do distributed transactions */
-	    /// <summary>
-	    /// </summary>
-	    /// <param name="context"></param>
-	    /// <param name="enlistingRM"> </param>
-	    public bool Enlist(TP.Transaction context, string enlistingRM)
-	    {
-		    System.Console.WriteLine(string.Format( "Transaction {0} enlisted", context.Id ));
+        /*  Called by RM.
+            This method notifies TM that it is involved in a given transaction
+            TM keeps track of which RM is enlisted with which transaction to do distributed transactions */
+        /// <summary>
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="enlistingRM"> </param>
+        public bool Enlist(TP.Transaction context, string enlistingRM)
+        {
+
+            System.Console.WriteLine(string.Format("Transaction {0} enlisted", context.Id));
             return false;
-	    }
+        }
 
         public void Register(string msg)
         {
-            string [] URL = msg.Split('$');
-            Console.WriteLine("Register "+ URL[0]);
+            string[] URL = msg.Split('$');
+            Console.WriteLine("Register " + URL[0]);
             TP.RM newRM = (TP.RM)System.Activator.GetObject(typeof(TP.RM), URL[0]);
             try
             {
-               newRM.SetName(URL[1]);
+                newRM.SetName(URL[1]);
             }
             catch (RemotingException e)
-            { 
+            {
                 Console.WriteLine(e.ToString());
             }
             lock (resourceManagers)
@@ -103,36 +107,36 @@ namespace MyTM
             resourceManagers.Add(rm);
         }
 
-	    public void shutdown() 
+        public void shutdown()
         {
             // TODO DO PROPER SHUTDOWN HERE
         }
 
-        
-        protected void init(String[] args) 
+
+        protected void init(String[] args)
         {
         }
 
-        
+
         protected void initStorage()
         {
             // TODO create commit log
         }
 
-        
+
         protected void recovery()
         {
             // TODO Abort/commit/garbage collect
         }
 
-        
-        protected void startUp() 
+
+        protected void startUp()
         {
             // TODO start garbage collector?
         }
 
-        
-        protected void readyToServe() 
+
+        protected void readyToServe()
         {
         }
 

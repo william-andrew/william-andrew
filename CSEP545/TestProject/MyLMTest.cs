@@ -1,15 +1,10 @@
-﻿using MyRM;
+﻿using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
+using MyRM;
 using TP;
-using MyWC;
-using MyTM;
-using System.Threading;
 
 namespace TestProject
 {
-    
-    
     /// <summary>
     ///This is a test class for MyLMTest and is intended
     ///to contain all MyLMTest Unit Tests
