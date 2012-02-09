@@ -157,11 +157,15 @@ namespace TP
 		/// <param name="resource"></param>
 		void LockForRead(Transaction context, Lockable resource);
 
-		/// <param name="context"></param>
-		/// <param name="resource"></param>
+        /// <param name="context"></param>
+        /// <param name="resource"></param>
+        void LockForUpdate(Transaction context, Lockable resource);
+
+        /// <param name="context"></param>
+        /// <param name="resource"></param>
         void LockForWrite(Transaction context, Lockable resource);
-		
-		/// <param name="context"></param>
+
+        /// <param name="context"></param>
 		void UnlockAll(Transaction context);
 
         /// <param name="ms"></param>

@@ -79,13 +79,13 @@ namespace MyRM
         static bool[,] CompatibilityTable = new bool[(int)MyLM.LockMode._Length, (int)MyLM.LockMode._Length]
 		{
 			{	// Null
-				true, true, false, true	
+				true, true, true, true	
 			},
 			{	// Read
-				true, true, false, false
+				true, true, true, false
 			},
 			{	// Update
-				false, false, false, false
+				true, true, false, false
 			},
 			{	// Write
 				true, false, false, false
@@ -148,7 +148,7 @@ namespace MyRM
 
                 // If we set locked mode to Update lock mode, we do not reset 
                 // the event because we still want to track the read locks.
-                if (locked != LockMode.Update)
+                if (request != LockMode.Update)
                     this.UnlockEvent.Reset();
             }
 
@@ -169,7 +169,7 @@ namespace MyRM
 
                 transactionList.Remove(context);
 
-                for (LockMode l = request; l > LockMode.Null; locked = --l)
+                for (LockMode l = locked; l > LockMode.Null; locked = --l)
                 {
                     // recalculate the strongest lock mode
                     System.Collections.Hashtable nextTransactionList = this.transactions[(int)l];
@@ -198,7 +198,7 @@ namespace MyRM
                     lock (this)
                     {
                         if (evnt == null)
-                            evnt = new System.Threading.ManualResetEvent(false);
+                            evnt = new System.Threading.ManualResetEvent(true);
                     }
                     return evnt;
                 }
@@ -244,7 +244,6 @@ namespace MyRM
                 }
             }
 
-            bool triedLockConvertion = false;
             for (int c = 0; ; c++)
             {
                 /* If someone else holds a lock 
@@ -253,21 +252,12 @@ namespace MyRM
                    if it doesn't happen, timeout for deadlock,
                    else try again to set the lock */
                 if (c > 0)
-                    if (!lockTarget.UnlockEvent.WaitOne(DEFAULT_DEADLOCK_TIMEOUT, false))
+                    if (!lockTarget.UnlockEvent.WaitOne((int)deadlockTimeout, false))
                     {
-                        // if other transactions still hold some locks, we failed to convert the read lock to write lock
-                        // Therefore, put the read lock back, remove the update lock and throw exception
-                        if (triedLockConvertion)
-                        {
-                            lockTarget.Register(context, LockMode.Read);
-                            lockTarget.Unregister(context, LockMode.Update);
-                            throw new ResourceLocked(string.Format("Cannot convert read lock on {0} to write lock", resource));
-                        }
-                        else
-                            throw new DeadLockDetected(string.Format("Resource {0} timed out", resource));
+                        throw new DeadLockDetected(string.Format("Resource {0} timed out", resource));
                     }
 
-                if (c > 0 && !triedLockConvertion)
+                if (c > 0)
                     System.Console.WriteLine(string.Format("Attempt {0} in resource {1}", c, resource));
 
                 // Get exclusive access to the resource
@@ -281,7 +271,7 @@ namespace MyRM
 
                     // Set the lock, if you can
                     if (lockTarget.Compatible(mode))
-                    {
+                    {                        
                         lockTarget.Register(context, mode);
                         return;
                     }
@@ -289,23 +279,14 @@ namespace MyRM
                         // context has a write lock on lockTarget and requested a read lock so no action is required.
                         return;
 
-                    // Lock conversion when requesting write lock on the existing read lock by this transaction
-                    if (mode == LockMode.Write)
+                    // Lock conversion when requesting write lock on the existing update lock by this transaction
+                    if (c > 0 && mode == LockMode.Write && lockTarget.HasLock(context, LockMode.Update))
                     {
-                        if (lockTarget.HasLock(context, LockMode.Read))
-                        {
-                            // release the read lock and obtain Update lock. 
-                            lockTarget.Unregister(context, LockMode.Read);
-                            lockTarget.Register(context, LockMode.Update);
-                            triedLockConvertion = true;
-                        }
-                        else if (lockTarget.HasLock(context, LockMode.Update))
-                        {
-                            // unlock the Update lock if conversion from read to write lock succeed.
-                            lockTarget.Unregister(context, LockMode.Update);
-                            lockTarget.Register(context, mode);
-                            return;
-                        }
+                        // unlock the Update lock if conversion from read to write lock succeed.
+                        lockTarget.Unregister(context, LockMode.Update);
+                        lockTarget.Register(context, mode);
+                        return;
+
                     }
                 }
             }
@@ -321,7 +302,12 @@ namespace MyRM
             Lock(context, resource, MyLM.LockMode.Read);
         }
 
-
+        // Get a update lock for the resource
+        public void LockForUpdate(TP.Transaction context, TP.Lockable resource)
+        {
+            Lock(context, resource, MyLM.LockMode.Update);
+        }
+        
         // Get a write lock for the resource
         public void LockForWrite(TP.Transaction context, TP.Lockable resource)
         {
@@ -359,6 +345,12 @@ namespace MyRM
             Unlock(context, resource, LockMode.Read);
         }
 
+
+        // A shortcut to unlock a update lock
+        public void UnlockUpdate(TP.Transaction context, TP.Lockable resource)
+        {
+            Unlock(context, resource, LockMode.Update);
+        }
 
         // A shortcut to unlock a write lock
         public void UnlockWrite(TP.Transaction context, TP.Lockable resource)

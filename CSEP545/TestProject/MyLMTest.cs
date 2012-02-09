@@ -65,7 +65,7 @@ namespace TestProject
 
         /// <summary>
         ///A test for Lock convert from read to write
-        /// rl1[x], wl1[x], success
+        /// upl1[x], wl1[x], success
         ///</summary>
         [TestMethod()]
         public void LockConversionTest1()
@@ -73,18 +73,17 @@ namespace TestProject
             MyLM target = new MyLM();
             target.setDeadlockTimeout(1000);
             Transaction context = new Transaction();
-            Transaction context2 = new Transaction();
             Lockable resource = new RID(RID.Type.CAR, "test");
-            target.LockForRead(context, resource);
+            target.LockForUpdate(context, resource);
             target.LockForWrite(context, resource);
         }
 
         /// <summary>
         ///A test for Lock convert from read to write
-        /// rl1[x], rl2[x], wl1[x], deadlock
+        /// upl1[x], rl2[x], wl1[x], deadlock
         ///</summary>
         [TestMethod()]
-        [ExpectedException(typeof(MyLM.ResourceLocked))]
+        [ExpectedException(typeof(MyLM.DeadLockDetected))]
         public void LockConversionTest2()
         {
             MyLM target = new MyLM();
@@ -93,14 +92,15 @@ namespace TestProject
             Transaction context2 = new Transaction();
             Lockable resource = new RID(RID.Type.CAR, "test");
             target.setDeadlockTimeout(10);
-            target.LockForRead(context, resource);
+            target.LockForUpdate(context, resource);
             target.LockForRead(context2, resource);
             target.LockForWrite(context, resource);
+            Assert.Fail("shall not reach this line");
         }
 
         /// <summary>
         ///A test for Lock convert from read to write
-        /// rl1[x], rl2[x], wl3[x], wl1[x], url2[x], uwl1[x], success
+        /// upl1[x], rl2[x], wl3[x], wl1[x], url2[x], uwl1[x], success
         ///</summary>
         [TestMethod()]
         public void LockConversionTest4()
@@ -111,7 +111,7 @@ namespace TestProject
             Transaction context2 = new Transaction();
             Transaction context3 = new Transaction();
             Lockable resource = new RID(RID.Type.CAR, "test");
-            target.LockForRead(context, resource);
+            target.LockForUpdate(context, resource);
             target.LockForRead(context2, resource);
             ManualResetEvent e = new ManualResetEvent(false);
             ManualResetEvent e1 = new ManualResetEvent(false);
@@ -142,16 +142,17 @@ namespace TestProject
 
         /// <summary>
         ///A test for Lock convert from read to write
-        /// rl1[x], rl2[x], wl1[x], url2[x], success
+        /// upl1[x], rl2[x], wl1[x], url2[x], success
         ///</summary>
         [TestMethod()]
         public void LockConversionTest3()
         {
             MyLM target = new MyLM();
+            target.setDeadlockTimeout(1000);
             Transaction context = new Transaction();
             Transaction context2 = new Transaction();
             Lockable resource = new RID(RID.Type.CAR, "test");
-            target.LockForRead(context, resource);
+            target.LockForUpdate(context, resource);
             target.LockForRead(context2, resource);
             ManualResetEvent e = new ManualResetEvent(false);
             ThreadPool.QueueUserWorkItem((obj) =>
