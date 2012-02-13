@@ -99,7 +99,7 @@ namespace MyWC
 
         public String QueryItinerary(Transaction context, Customer customer)
         {
-            StringBuilder buf = new StringBuilder(1024);
+            var buf = new StringBuilder(1024);
             buf.Append(Flights.QueryReserved(context, customer));
             if (buf.Length > 0) buf.Append(',');
             buf.Append(Cars.QueryReserved(context, customer));

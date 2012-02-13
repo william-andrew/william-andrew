@@ -62,7 +62,7 @@ namespace TestProject
         public void DeleteTest()
         {
             MyRM.MyRM_Accessor target = MockRM();
-            target.SetName("test");
+            target.SetName("test" + Guid.NewGuid());
             Transaction context = new Transaction();
             Customer c = new Customer();
             RID rid = new RID(RID.Type.ROOM, "test1");
