@@ -18,31 +18,32 @@ namespace TestProject
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
             rm.SetName("flight");
+            rm.TransactionManager = tm;
             tm.Register(rm);
             MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
 
-            var context = new Transaction();
+            var context = tm.Start();
             wc.AddSeats(context, "FL", 100, 550);
             wc.AddSeats(context, "SG", 200, 250);
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             var result = wc.ListFlights(context);
             tm.Commit(context);
             Assert.AreEqual(2, result.Length);
 
-            context = new Transaction();
+            context = tm.Start();
             wc.AddSeats(context, "FL", 50, 450);
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             var c = wc.QueryFlight(context, "FL");
             Assert.AreEqual(150, c);
             var price = wc.QueryFlightPrice(context, "FL");
             Assert.AreEqual(450, price);
             tm.Abort(context);
 
-            context = new Transaction();
+            context = tm.Start();
             c = wc.QueryFlight(context, "SG");
             price = wc.QueryFlightPrice(context, "SG");
             Assert.AreEqual(200, c);
@@ -60,10 +61,11 @@ namespace TestProject
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
             rm.SetName("flight");
+            rm.TransactionManager = tm;
             tm.Register(rm);
             MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
 
-            var context = new Transaction();
+            var context = tm.Start();
             var flights = wc.ListFlights(context);
             foreach(var f in flights)
             {
@@ -75,17 +77,17 @@ namespace TestProject
             Assert.IsTrue(wc.AddSeats(context, "SGX", 200, 250));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             var result = wc.ListFlights(context);
             tm.Commit(context);
             Assert.AreEqual(2, result.Length);
 
-            context = new Transaction();
+            context = tm.Start();
             Assert.IsTrue(wc.DeleteSeats(context, "FLX", 50));
             Assert.IsTrue(wc.DeleteSeats(context, "SGX", 50));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             var c1 = wc.QueryFlight(context, "FLX");
             var c2 = wc.QueryFlight(context, "SGX");
             Assert.AreEqual(100 - 50, c1);
@@ -103,20 +105,21 @@ namespace TestProject
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
             rm.SetName("flight");
+            rm.TransactionManager = tm;
             tm.Register(rm);
             MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
 
-            var context = new Transaction();
+            var context = tm.Start();
             Assert.IsTrue(wc.AddSeats(context, "FLK", 100, 550));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             var result = wc.ListFlights(context);
             tm.Commit(context);
 
             Assert.IsTrue((from f in result where f == "FLK,100,550" select f).Any());
 
-            context = new Transaction();
+            context = tm.Start();
             Assert.IsTrue(wc.DeleteFlight(context, "FLK"));
             result = wc.ListFlights(context);
             tm.Commit(context);
@@ -134,15 +137,16 @@ namespace TestProject
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
             rm.SetName("room");
+            rm.TransactionManager = tm;
             tm.Register(rm);
             MyWC.MyWC.Rooms = tm.GetResourceMananger("room");
 
-            var context = new Transaction();
+            var context = tm.Start();
             Assert.IsTrue(wc.AddRooms(context, "SEATTLE", 100, 66));
             Assert.IsTrue(wc.AddRooms(context, "BEIJING", 200, 220));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             Assert.AreEqual(100, wc.QueryRoom(context, "SEATTLE"));
             Assert.AreEqual(66, wc.QueryRoomPrice(context, "SEATTLE"));
 
@@ -151,12 +155,12 @@ namespace TestProject
             tm.Commit(context);
 
             //add rooms
-            context = new Transaction();
+            context = tm.Start();
             Assert.IsTrue(wc.AddRooms(context, "SEATTLE", 10, 55));
             Assert.IsTrue(wc.AddRooms(context, "BEIJING", 20, 110));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             Assert.AreEqual(100 + 10, wc.QueryRoom(context, "SEATTLE"));
             Assert.AreEqual(55, wc.QueryRoomPrice(context, "SEATTLE"));
 
@@ -165,12 +169,12 @@ namespace TestProject
             tm.Commit(context);
 
             //delete rooms
-            context = new Transaction();
+            context = tm.Start();
             Assert.IsTrue(wc.DeleteRooms(context, "SEATTLE", 5));
             Assert.IsTrue(wc.DeleteRooms(context, "BEIJING", 10));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             Assert.AreEqual(100 + 10 - 5, wc.QueryRoom(context, "SEATTLE"));
             Assert.AreEqual(55, wc.QueryRoomPrice(context, "SEATTLE"));
             
@@ -189,15 +193,16 @@ namespace TestProject
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
             rm.SetName("car");
+            rm.TransactionManager = tm;
             tm.Register(rm);
             MyWC.MyWC.Cars = tm.GetResourceMananger("car");
 
-            var context = new Transaction();
+            var context = tm.Start();
             Assert.IsTrue(wc.AddCars(context, "SEATTLE", 100, 66));
             Assert.IsTrue(wc.AddCars(context, "BEIJING", 200, 220));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             Assert.AreEqual(100, wc.QueryCar(context, "SEATTLE"));
             Assert.AreEqual(66, wc.QueryCarPrice(context, "SEATTLE"));
 
@@ -206,12 +211,12 @@ namespace TestProject
             tm.Commit(context);
 
             //add rooms
-            context = new Transaction();
+            context = tm.Start();
             Assert.IsTrue(wc.AddCars(context, "SEATTLE", 10, 55));
             Assert.IsTrue(wc.AddCars(context, "BEIJING", 20, 110));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             Assert.AreEqual(100 + 10, wc.QueryCar(context, "SEATTLE"));
             Assert.AreEqual(55, wc.QueryCarPrice(context, "SEATTLE"));
 
@@ -220,12 +225,12 @@ namespace TestProject
             tm.Commit(context);
 
             //delete rooms
-            context = new Transaction();
+            context = tm.Start();
             Assert.IsTrue(wc.DeleteCars(context, "SEATTLE", 5));
             Assert.IsTrue(wc.DeleteCars(context, "BEIJING", 10));
             tm.Commit(context);
 
-            context = new Transaction();
+            context = tm.Start();
             Assert.AreEqual(100 + 10 - 5, wc.QueryCar(context, "SEATTLE"));
             Assert.AreEqual(55, wc.QueryCarPrice(context, "SEATTLE"));
 
@@ -247,8 +252,11 @@ namespace TestProject
             var rmr = new MyRM.MyRM();
 
             rmf.SetName("flight");
+            rmf.TransactionManager = tm;
             rmc.SetName("car");
+            rmf.TransactionManager = tm;
             rmr.SetName("room");
+            rmr.TransactionManager = tm;
 
             tm.Register(rmf);
             tm.Register(rmc);
@@ -284,8 +292,11 @@ namespace TestProject
             var rmr = new MyRM.MyRM();
 
             rmf.SetName("flight");
+            rmf.TransactionManager = tm;
             rmc.SetName("car");
+            rmc.TransactionManager = tm;
             rmr.SetName("room");
+            rmr.TransactionManager = tm;
 
             tm.Register(rmf);
             tm.Register(rmc);
@@ -339,6 +350,7 @@ namespace TestProject
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
             rm.SetName("flight");
+            rm.TransactionManager = tm;
             tm.Register(rm);
             MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
 
@@ -364,6 +376,7 @@ namespace TestProject
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
             rm.SetName("flight");
+            rm.TransactionManager = tm;
             tm.Register(rm);
             MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
 

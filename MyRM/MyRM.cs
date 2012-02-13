@@ -18,7 +18,7 @@ namespace MyRM
         private string name;
 
         static TP.TM transactionManager = null;
-
+ 
         internal class GlobalState
         {
             public enum RunMode
@@ -84,6 +84,12 @@ namespace MyRM
         public string GetName()
         {
             return name;
+        }
+
+        // Property injection for testing only
+        public TP.TM TransactionManager
+        {
+            set { transactionManager = value; }
         }
 
         class RMParser : CommandLineParser
@@ -182,7 +188,7 @@ namespace MyRM
         /// <param name="context"></param>
         public void Enlist(TP.Transaction context)
         {
-            // transactionManager.Enlist(context);
+             transactionManager.Enlist(context, this.GetName());
         }
 
         /// <summary>
@@ -219,6 +225,8 @@ namespace MyRM
         /// <returns></returns>
         public bool Add(TP.Transaction context, TP.RID i, int count, int price)
         {
+            Enlist(context);
+
             lockManager.LockForWrite(context, i);
             Resource res = TransactionStorage.Read(context, i);
             if (res == null)
@@ -244,6 +252,8 @@ namespace MyRM
         /// <returns></returns>
         public bool Delete(TP.Transaction context, RID rid)
         {
+            Enlist(context);
+
             lockManager.LockForWrite(context, rid);
             bool removed = TransactionStorage.Delete(context, rid);
 
@@ -271,6 +281,8 @@ namespace MyRM
         /// <returns>true the given resources exists. False if not</returns>
         public bool Delete(Transaction context, RID rid, int count)
         {
+            Enlist(context);
+
             lockManager.LockForWrite(context, rid);
             Resource resource = TransactionStorage.Read(context, rid); ;
 
@@ -332,6 +344,8 @@ namespace MyRM
         /// <returns>returns the amount available for the specified item type */</returns>
         public int Query(TP.Transaction context, RID rid)
         {
+            Enlist(context);
+
             lockManager.LockForRead(context, rid);
             Console.WriteLine("RM: Query");
             Resource resource = TransactionStorage.Read(context, rid);
@@ -352,6 +366,8 @@ namespace MyRM
         /// <returns>returns the price for the specified item type</returns>
         public int QueryPrice(Transaction context, RID rid)
         {
+            Enlist(context);
+
             lockManager.LockForRead(context, rid);
             Resource resource = TransactionStorage.Read(context, rid);
 
@@ -371,6 +387,8 @@ namespace MyRM
         /// <returns>the string of the list of reserved resources for the customer</returns>
         public String QueryReserved(Transaction context, Customer customer)
         {
+            Enlist(context);
+
             lockManager.LockForRead(context, customer);
             StringBuilder buf = new StringBuilder(512);
 
@@ -397,6 +415,8 @@ namespace MyRM
         /// <returns>the total price of reserved resources for the customer</returns>
         public int QueryReservedPrice(Transaction context, Customer customer)
         {
+            Enlist(context);
+
             int bill = 0;
 
             lockManager.LockForRead(context, customer);
@@ -427,6 +447,8 @@ namespace MyRM
         /// <returns>true if reservation is successful</returns>
         public bool Reserve(Transaction context, Customer c, RID i)
         {
+            Enlist(context);
+
             lockManager.LockForWrite(context, c);
             lockManager.LockForWrite(context, i);
             Resource resource = TransactionStorage.Read(context, i);
@@ -461,6 +483,8 @@ namespace MyRM
         /// <param name="c"></param>
         public void UnReserve(Transaction context, Customer c)
         {
+            Enlist(context);
+
             lockManager.LockForWrite(context, c);
             HashSet<RID> r = TransactionStorage.Read(context, c);
             if (r == null)
@@ -496,6 +520,8 @@ namespace MyRM
         /// <returns></returns>
         public String[] ListResources(Transaction context, RID.Type type)
         {
+            Enlist(context);
+
             List<string> result = new List<string>();
             foreach (Resource resource in TransactionStorage.GetResources(context))
             {
@@ -514,7 +540,9 @@ namespace MyRM
         /// <returns></returns>
         public Customer[] ListCustomers(Transaction context)
         {
-            List<Customer> customers = new List<Customer>(TransactionStorage.GetCustomers(context));
+            Enlist(context);
+
+            var customers = new List<Customer>(TransactionStorage.GetCustomers(context));
             return customers.ToArray();
         }
 

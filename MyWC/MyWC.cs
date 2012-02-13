@@ -59,10 +59,8 @@ namespace MyWC
 
                 throw;
             }
-
             return true;
         }
-
 
         public bool CancelItinerary(Customer customer)
         {
@@ -87,7 +85,6 @@ namespace MyWC
             return true;
         }
 
-
         public int QueryItineraryPrice(Transaction context, Customer customer)
         {
             int bill = Flights.QueryReservedPrice(context, customer);
@@ -95,7 +92,6 @@ namespace MyWC
             bill += Rooms.QueryReservedPrice(context, customer);
             return bill;
         }
-
 
         public String QueryItinerary(Transaction context, Customer customer)
         {
@@ -140,7 +136,6 @@ namespace MyWC
             return Rooms.Delete(context, RID.forRoom(location), numRooms);
         }
 
-
         public bool AddCars(Transaction context, String location, int numCars,
                int price)
         {
@@ -152,42 +147,35 @@ namespace MyWC
             return Cars.Delete(context, RID.forCar(location), numCars);
         }
 
-
         public int QueryFlight(Transaction context, String flight)
         {
             return Flights.Query(context, RID.forFlight(flight));
         }
-
 
         public int QueryFlightPrice(Transaction context, String flight)
         {
             return Flights.QueryPrice(context, RID.forFlight(flight));
         }
 
-
         public int QueryRoom(Transaction context, String location)
         {
             return Rooms.Query(context, RID.forRoom(location));
         }
-
 
         public int QueryRoomPrice(Transaction context, String location)
         {
             return Rooms.QueryPrice(context, RID.forRoom(location));
         }
 
-
         public int QueryCar(Transaction context, String location)
         {
             return Cars.Query(context, RID.forCar(location));
         }
 
-
         public int QueryCarPrice(Transaction context, String location)
         {
             return Cars.QueryPrice(context, RID.forCar(location));
         }
-
 
         public String[] ListFlights(Transaction context)
         {
@@ -204,40 +192,35 @@ namespace MyWC
             return Rooms.ListResources(context, RID.Type.ROOM);
         }
 
-
         public Customer[] ListCustomers(Transaction context)
         {
-            HashSet<Customer> customers = new HashSet<Customer>();
+            var customers = new HashSet<Customer>();
             foreach (Customer c in Flights.ListCustomers(context))
                 customers.Add(c);
             foreach (Customer c in Cars.ListCustomers(context))
                 customers.Add(c);
             foreach (Customer c in Rooms.ListCustomers(context))
                 customers.Add(c);
-            Customer[] cs = new Customer[customers.Count];
+            var cs = new Customer[customers.Count];
 
             customers.CopyTo(cs);
             return cs;
         }
-
 
         public Transaction Start()
         {
             return TransactionManager.Start();
         }
 
-
         public void Commit(Transaction context)
         {
             TransactionManager.Commit(context);
         }
 
-
         public void Abort(Transaction context)
         {
             TransactionManager.Abort(context);
         }
-
 
         protected void Init(String[] args)
         {
@@ -253,11 +236,9 @@ namespace MyWC
         {
         }
 
-
         protected void StartUp()
         {
         }
-
 
         protected void ReadyToServe()
         {

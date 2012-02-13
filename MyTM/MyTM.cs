@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using TP;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Serialization.Formatters;
@@ -14,21 +15,22 @@ namespace MyTM
     /// </summary>
     public class MyTM : System.MarshalByRefObject, TP.TM
     {
-        private HashSet<RM> resourceManagers;
+        private readonly HashSet<RM> _resourceManagers;
+        private readonly Dictionary<Transaction, List<RM>> _resourceManagersInTransaction = new Dictionary<Transaction, List<RM>>();  
 
         public MyTM()
         {
             System.Console.WriteLine("Transaction Manager instantiated");
-            resourceManagers = new HashSet<RM>();
+            _resourceManagers = new HashSet<RM>();
         }
 
         public RM GetResourceMananger(string name)
         {
-            lock (resourceManagers)
+            lock (_resourceManagers)
             {
-                foreach (RM rm in resourceManagers)
+                foreach (RM rm in _resourceManagers)
                 {
-                    if (rm.GetName().Contains(name.ToLower()))
+                    if (String.Compare(rm.GetName(), name, StringComparison.OrdinalIgnoreCase) == 0)
                         return rm;
                 }
             }
@@ -37,7 +39,7 @@ namespace MyTM
 
         public TP.Transaction Start()
         {
-            Transaction context = new Transaction();
+            var context = new Transaction();
             System.Console.WriteLine(string.Format("TM: Transaction {0} started", context.Id));
             return context;
         }
@@ -48,10 +50,25 @@ namespace MyTM
         /// <param name="context"></param>
         public void Commit(TP.Transaction context)
         {
-            foreach (RM rm in resourceManagers)
-            {
-                rm.Commit(context);
+            lock (_resourceManagersInTransaction)
+            {                            
+                if (!_resourceManagersInTransaction.ContainsKey(context))
+                    throw new ApplicationException("Transaction not found " + context);
+
+                var list = _resourceManagersInTransaction[context];
+
+                foreach(RM r in list)
+                {
+                    r.Commit(context);
+                }
+
+                _resourceManagersInTransaction.Remove(context);
             }
+
+            //foreach (RM rm in _resourceManagers)
+           // {
+             //   rm.Commit(context);
+            //}
             System.Console.WriteLine(string.Format("Transaction {0} commited", context.Id));
         }
 
@@ -61,10 +78,25 @@ namespace MyTM
         /// <param name="context"></param>
         public void Abort(TP.Transaction context)
         {
-            foreach (RM rm in resourceManagers)
+            lock (_resourceManagersInTransaction)
             {
-                rm.Abort(context);
+                if (!_resourceManagersInTransaction.ContainsKey(context))
+                    throw new ApplicationException("Transaction not found " + context);
+
+                var list = _resourceManagersInTransaction[context];
+
+                foreach (RM r in list)
+                {
+                    r.Abort(context);
+                }
+
+                _resourceManagersInTransaction.Remove(context);
             }
+
+            //foreach (RM rm in _resourceManagers)
+            //{
+            //    rm.Abort(context);
+            //}
             System.Console.WriteLine(string.Format("Transaction {0} aborted", context.Id));
         }
 
@@ -77,9 +109,32 @@ namespace MyTM
         /// <param name="enlistingRM"> </param>
         public bool Enlist(TP.Transaction context, string enlistingRM)
         {
+            var rm = GetResourceMananger(enlistingRM);
+            if (rm == null)
+            {
+                throw new ApplicationException(enlistingRM + " not registered.");
+            }
+
+            lock (_resourceManagersInTransaction)
+            {
+                if (_resourceManagersInTransaction.ContainsKey(context))
+                {
+                    var list = _resourceManagersInTransaction[context];
+                    
+                    if (!list.Contains(rm))
+                    {
+                        list.Add(rm);
+                    }
+                }
+                else
+                {
+                    _resourceManagersInTransaction.Add(context, new List<RM> {rm});
+                }
+            
+            }
 
             System.Console.WriteLine(string.Format("Transaction {0} enlisted", context.Id));
-            return false;
+            return true;
         }
 
         public void Register(string msg)
@@ -95,16 +150,16 @@ namespace MyTM
             {
                 Console.WriteLine(e.ToString());
             }
-            lock (resourceManagers)
+            lock (_resourceManagers)
             {
-                resourceManagers.Add(newRM);
+                _resourceManagers.Add(newRM);
             }
         }
 
         //TODO: REFACTOR THIS FOR TESTING
         public void Register(TP.RM rm)
         {
-            resourceManagers.Add(rm);
+            _resourceManagers.Add(rm);
         }
 
         public void shutdown()
