@@ -178,8 +178,6 @@ namespace MyRM
 
             Console.WriteLine("{0}: Exitting", GlobalState.Name);
         }
-
-
      
         /// <summary>
         /// Currently does not involve TM, will do it in later step

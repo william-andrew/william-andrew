@@ -133,7 +133,7 @@ namespace MyTM
             
             }
 
-            System.Console.WriteLine(string.Format("Transaction {0} enlisted", context.Id));
+            System.Console.WriteLine(string.Format("Transaction {0} enlisted for {1}", context.Id, enlistingRM));
             return true;
         }
 

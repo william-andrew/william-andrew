@@ -10,7 +10,7 @@ namespace MyWC
     /// <summary>
     /// Workflow Controller
     /// </summary>
-    public class MyWC : System.MarshalByRefObject, TP.WC
+    public class MyWC : MarshalByRefObject, WC
     {
         /// <summary>
         /// Resource Manager for each resource type
@@ -47,16 +47,11 @@ namespace MyWC
                     Flights.Reserve(tid, c, RID.forFlight(flight));
                 }
 
-                Cars.Commit(tid);
-                Flights.Commit(tid);
-                Rooms.Commit(tid);
+                TransactionManager.Commit(tid);
             }
-            catch (System.Exception e)
+            catch (Exception e)
             {
-                Cars.Abort(tid);
-                Flights.Abort(tid);
-                Rooms.Abort(tid);
-
+                TransactionManager.Abort(tid);
                 throw;
             }
             return true;
@@ -64,22 +59,18 @@ namespace MyWC
 
         public bool CancelItinerary(Customer customer)
         {
-            Transaction xid = new Transaction();
+            TP.Transaction tid = TransactionManager.Start();
             try
             {
-                Flights.UnReserve(xid, customer);
-                Cars.UnReserve(xid, customer);
-                Rooms.UnReserve(xid, customer);
+                Flights.UnReserve(tid, customer);
+                Cars.UnReserve(tid, customer);
+                Rooms.UnReserve(tid, customer);
 
-                Cars.Commit(xid);
-                Flights.Commit(xid);
-                Rooms.Commit(xid);
+                TransactionManager.Commit(tid);
             }
             catch (Exception e)
             {
-                Cars.Abort(xid);
-                Flights.Abort(xid);
-                Rooms.Abort(xid);
+                TransactionManager.Abort(tid);
                 throw new Exception("caught an exception", e);
             }
             return true;
