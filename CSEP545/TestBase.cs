@@ -97,7 +97,6 @@
             StartTM();
             StartWC();
             StartRMs();
-           
         }
 
         static void StopTM()

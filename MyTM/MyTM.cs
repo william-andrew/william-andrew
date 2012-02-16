@@ -1,34 +1,89 @@
 using System;
-using System.Collections.Concurrent;
-using TP;
-using System.Runtime.Remoting.Channels;
-using System.Runtime.Serialization.Formatters;
 using System.Collections;
-using System.Runtime.Remoting.Channels.Http;
-using System.Runtime.Remoting;
 using System.Collections.Generic;
+using System.Runtime.Remoting;
+using System.Runtime.Remoting.Channels;
+using System.Runtime.Remoting.Channels.Http;
+using System.Runtime.Serialization.Formatters;
+using System.Threading;
+using TP;
 
 namespace MyTM
 {
     /// <summary>
     /*  Transaction Manager */
     /// </summary>
-    public class MyTM : System.MarshalByRefObject, TP.TM
+    public class MyTM : MarshalByRefObject, TP.TM
     {
-        private readonly HashSet<RM> _resourceManagers;
-        private readonly Dictionary<Transaction, List<RM>> _resourceManagersInTransaction = new Dictionary<Transaction, List<RM>>();  
+        private readonly Dictionary<string, RM> _resourceManagers;
+        private readonly Dictionary<Transaction, ResourceManagerList> _resourceManagersEnlistedInTransactions
+            = new Dictionary<Transaction, ResourceManagerList>();
+
+        private static readonly AutoResetEvent ShutdownEvent = new AutoResetEvent(false);
+        private const int TransactionTimeout = 120;
+        private readonly Thread _transactionScavengerThread;
 
         public MyTM()
         {
-            System.Console.WriteLine("Transaction Manager instantiated");
-            _resourceManagers = new HashSet<RM>();
+            Console.WriteLine("TM: Transaction Manager instantiated");
+            _resourceManagers = new Dictionary<string, RM>();
+
+            _transactionScavengerThread = new Thread(TransactionScavenger) { Name = "TransactionScavengerThread" };
+            _transactionScavengerThread.Start();
+        }
+
+        // Scan transactions and abort them if times out
+        public void TransactionScavenger()
+        {
+            while (ShutdownEvent.WaitOne(30000, false) == false)
+            {
+                try
+                {
+                    Console.WriteLine("TM: Scavenging stale transactions started...");
+
+                    lock (_resourceManagersEnlistedInTransactions)
+                    {
+                        var transactionsAborted = new List<Transaction>();
+
+                        Console.WriteLine("TM: {0} transactions ", _resourceManagersEnlistedInTransactions.Keys.Count);
+
+                        foreach(var item in _resourceManagersEnlistedInTransactions)
+                        {
+                            var transaction = item.Key;
+                            var rmList = item.Value.ResourceManagers;
+                            var t = DateTime.Now.Subtract(item.Value.TransactionStartTime);
+
+                            if (t.Seconds > TransactionTimeout)
+                            {
+                                foreach (RM r in rmList)
+                                {
+                                    r.Abort(transaction);
+                                }
+                                Console.WriteLine(string.Format("TM: stale transaction {0} aborted", transaction));
+                                transactionsAborted.Add(transaction);
+                            }
+                        }
+
+                        foreach (var transaction in transactionsAborted)
+                        {
+                            _resourceManagersEnlistedInTransactions.Remove(transaction);
+                        }
+
+                        Console.WriteLine("TM: Scavenging stale transactions ended.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+            }
         }
 
         public RM GetResourceMananger(string name)
         {
             lock (_resourceManagers)
             {
-                foreach (RM rm in _resourceManagers)
+                foreach (RM rm in _resourceManagers.Values)
                 {
                     if (String.Compare(rm.GetName(), name, StringComparison.OrdinalIgnoreCase) == 0)
                         return rm;
@@ -40,7 +95,7 @@ namespace MyTM
         public TP.Transaction Start()
         {
             var context = new Transaction();
-            System.Console.WriteLine(string.Format("TM: Transaction {0} started", context.Id));
+            Console.WriteLine(string.Format("TM: Transaction {0} started", context.Id));
             return context;
         }
 
@@ -50,26 +105,21 @@ namespace MyTM
         /// <param name="context"></param>
         public void Commit(TP.Transaction context)
         {
-            lock (_resourceManagersInTransaction)
-            {                            
-                if (!_resourceManagersInTransaction.ContainsKey(context))
-                    throw new ApplicationException("Transaction not found " + context);
-
-                var list = _resourceManagersInTransaction[context];
-
-                foreach(RM r in list)
+            lock (_resourceManagersEnlistedInTransactions)
+            {
+                if (_resourceManagersEnlistedInTransactions.ContainsKey(context))
                 {
-                    r.Commit(context);
+                    var list = _resourceManagersEnlistedInTransactions[context].ResourceManagers;
+
+                    foreach (RM r in list)
+                    {
+                        r.Commit(context);
+                    }
+
+                    _resourceManagersEnlistedInTransactions.Remove(context);
                 }
-
-                _resourceManagersInTransaction.Remove(context);
             }
-
-            //foreach (RM rm in _resourceManagers)
-           // {
-             //   rm.Commit(context);
-            //}
-            System.Console.WriteLine(string.Format("Transaction {0} commited", context.Id));
+            Console.WriteLine(string.Format("TM: Transaction {0} commited", context.Id));
         }
 
         /// <summary>
@@ -78,26 +128,22 @@ namespace MyTM
         /// <param name="context"></param>
         public void Abort(TP.Transaction context)
         {
-            lock (_resourceManagersInTransaction)
+            lock (_resourceManagersEnlistedInTransactions)
             {
-                if (!_resourceManagersInTransaction.ContainsKey(context))
-                    throw new ApplicationException("Transaction not found " + context);
-
-                var list = _resourceManagersInTransaction[context];
-
-                foreach (RM r in list)
+                if (_resourceManagersEnlistedInTransactions.ContainsKey(context))
                 {
-                    r.Abort(context);
-                }
+                    var list = _resourceManagersEnlistedInTransactions[context].ResourceManagers;
 
-                _resourceManagersInTransaction.Remove(context);
+                    foreach (RM r in list)
+                    {
+                        r.Abort(context);
+                    }
+
+                    _resourceManagersEnlistedInTransactions.Remove(context);
+                }
             }
 
-            //foreach (RM rm in _resourceManagers)
-            //{
-            //    rm.Abort(context);
-            //}
-            System.Console.WriteLine(string.Format("Transaction {0} aborted", context.Id));
+            Console.WriteLine(string.Format("TM: Transaction {0} aborted", context.Id));
         }
 
         /*  Called by RM.
@@ -115,12 +161,12 @@ namespace MyTM
                 throw new ApplicationException(enlistingRM + " not registered.");
             }
 
-            lock (_resourceManagersInTransaction)
+            lock (_resourceManagersEnlistedInTransactions)
             {
-                if (_resourceManagersInTransaction.ContainsKey(context))
+                if (_resourceManagersEnlistedInTransactions.ContainsKey(context))
                 {
-                    var list = _resourceManagersInTransaction[context];
-                    
+                    var list = _resourceManagersEnlistedInTransactions[context];
+
                     if (!list.Contains(rm))
                     {
                         list.Add(rm);
@@ -128,12 +174,12 @@ namespace MyTM
                 }
                 else
                 {
-                    _resourceManagersInTransaction.Add(context, new List<RM> {rm});
+                    _resourceManagersEnlistedInTransactions.Add(context, new ResourceManagerList(rm));
                 }
-            
+
             }
 
-            System.Console.WriteLine(string.Format("Transaction {0} enlisted for {1}", context.Id, enlistingRM));
+            Console.WriteLine(string.Format("TM: Transaction {0} enlisted for {1}", context.Id, enlistingRM));
             return true;
         }
 
@@ -141,7 +187,7 @@ namespace MyTM
         {
             string[] URL = msg.Split('$');
             Console.WriteLine("Register " + URL[0]);
-            TP.RM newRM = (TP.RM)System.Activator.GetObject(typeof(TP.RM), URL[0]);
+            TP.RM newRM = (TP.RM)Activator.GetObject(typeof(TP.RM), URL[0]);
             try
             {
                 newRM.SetName(URL[1]);
@@ -152,19 +198,24 @@ namespace MyTM
             }
             lock (_resourceManagers)
             {
-                _resourceManagers.Add(newRM);
+                if (!_resourceManagers.ContainsKey(newRM.GetName()))
+                    _resourceManagers.Add(newRM.GetName(), newRM);
             }
         }
 
         //TODO: REFACTOR THIS FOR TESTING
         public void Register(TP.RM rm)
         {
-            _resourceManagers.Add(rm);
+            _resourceManagers.Add(rm.GetName(), rm);
         }
 
         public void shutdown()
         {
             // TODO DO PROPER SHUTDOWN HERE
+            ShutdownEvent.Set();
+
+            if (null != _transactionScavengerThread)
+                _transactionScavengerThread.Join();
         }
 
 
@@ -211,26 +262,25 @@ namespace MyTM
                 return;
             }
 
-            SoapServerFormatterSinkProvider serverProv = new SoapServerFormatterSinkProvider();
-            serverProv.TypeFilterLevel = TypeFilterLevel.Full;
+            var serverProv = new SoapServerFormatterSinkProvider { TypeFilterLevel = TypeFilterLevel.Full };
 
-            SoapClientFormatterSinkProvider clientProv = new SoapClientFormatterSinkProvider();
+            var clientProv = new SoapClientFormatterSinkProvider();
 
             IDictionary props = new Hashtable();
             props["port"] = Int32.Parse(parser["p"]);
 
-            HttpChannel channel = new HttpChannel(props, clientProv, serverProv);
+            var channel = new HttpChannel(props, clientProv, serverProv);
             ChannelServices.RegisterChannel(channel, false);
 
             RemotingConfiguration.RegisterWellKnownServiceType
-                (Type.GetType("MyTM.MyTM")								// full type name
-                        , "TM.soap"												// URI
+                (Type.GetType("MyTM.MyTM")  // full type name
+                        , "TM.soap"         // URI
                         , System.Runtime.Remoting.WellKnownObjectMode.Singleton	// instancing mode
                 );
 
             while (true)
             {
-                System.Threading.Thread.Sleep(100000);
+                Thread.Sleep(100000);
             }
         }
 

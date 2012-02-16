@@ -158,8 +158,6 @@ namespace MyRM
                         System.Threading.Thread.Sleep(1000);
                     }
                 }
-
-
             }
 
             Console.WriteLine("{0} RM: Transaction Manager retrieved at {1}", GlobalState.Name, parser["tm"]);
@@ -289,19 +287,16 @@ namespace MyRM
                 // silently discard
                 return false;
             }
+            if (resource.getCount() > count)
+            {
+                resource.decrCount(count);
+            }
             else
             {
-                if (resource.getCount() > count)
-                {
-                    resource.decrCount(count);
-                }
-                else
-                {
-                    resource.setCount(0);
-                }
-
-                TransactionStorage.Write(context, rid, resource);
+                resource.setCount(0);
             }
+
+            TransactionStorage.Write(context, rid, resource);
             return true;
         }
 

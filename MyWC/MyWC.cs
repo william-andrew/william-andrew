@@ -283,7 +283,7 @@ namespace MyWC
                 }
             }
 
-            Console.WriteLine("Transaction Manager retrieved at {0}", tmURL);
+            Console.WriteLine("Transaction Manager retrieved at {0}:{1}", tmURL, tmPort);
             while (Flights == null || Rooms == null || Cars == null)
             {
                 if (Flights == null)
