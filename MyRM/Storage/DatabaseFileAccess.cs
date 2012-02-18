@@ -14,7 +14,7 @@ namespace MyRM.Storage
     //TODO: INTEGRATE WITH CALLER!!
     public class DatabaseFileAccess
     {
-        private const int DefaultPageSize = 1024;
+        private const int DefaultPageSize = 4096;
         private const int DefaultPageNumber = 1024;
         public const int DefaultPageHeaderSize = 64;
         private const int DataFileHeaderSize = 512;
@@ -251,10 +251,7 @@ namespace MyRM.Storage
                         //Mark Page Header - {P}{.}{Page Index}{RowSize}{rowsPerPage}{NextFreeRowIndex} 
                         var encoder = new UTF8Encoding();
 
-                        byte[] byteArray = encoder.GetBytes("P");
-                        fileStream.Write(byteArray, 0, byteArray.Length);
-
-                        byteArray = encoder.GetBytes(".");
+                        byte[] byteArray = encoder.GetBytes("P.");
                         fileStream.Write(byteArray, 0, byteArray.Length);
 
                         byteArray = BitConverter.GetBytes(i);
@@ -306,14 +303,39 @@ namespace MyRM.Storage
             }
         }
 
-        public void CommitPage(string tableName, Page page0)
+        public void CommitPage(string tableName, Page page)
         {
-            if (!page0.IsDirty)
+            if (!page.IsDirty)
                 return;
 
-            _tables[tableName] = page0.ShadowId;
+            _tables[tableName] = page.ShadowId;
 
             WriteDatabaseManifest();
+        }
+
+        public PageTable ReadPageTable(string tableName)
+        {
+            string filename = tableName + ".index." + _tables[tableName];
+            using (var fileStream = new FileStream(filename, FileMode.OpenOrCreate))
+            {
+                //TODO: FIX THIS
+                var buffer = new byte[4096];
+                fileStream.Seek(0, SeekOrigin.Begin);
+                fileStream.Read(buffer, 0, buffer.Length);
+                return new PageTable(buffer);
+            }
+        }
+
+        public void WritePageTable(string tableName, PageTable pt)
+        {
+            string filename = tableName + ".index." + _tables[tableName];
+            using (var fileStream = new FileStream(filename, FileMode.OpenOrCreate))
+            {
+                //TODO: FIX THIS
+                var buffer = new byte[4096];
+                fileStream.Seek(0, SeekOrigin.Begin);
+                fileStream.Write(pt.GetBytes(), 0, buffer.Length);
+            }
         }
     }
 }

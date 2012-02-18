@@ -10,6 +10,7 @@ namespace TestProject
     [TestClass()]
     public class DatabaseFileAccessTest
     {
+
         [TestMethod()]
         public void PageReadWriteTest()
         {
@@ -80,6 +81,23 @@ namespace TestProject
             var page2 = db.ReadPage("Inventory.Car", 1);
             Assert.AreEqual("Page Data", encoder.GetString(page2.Row(8).Data, 0, byteArray.Length));
 
+        }
+
+        [TestMethod]
+        public void ReadPageTable()
+        {
+            var db = new DatabaseFileAccess("Car");
+            db.Initialize();
+            var key = Guid.NewGuid().ToString();
+
+            db.CreateTable("Inventory.Car", 100);
+            PageTable pt = db.ReadPageTable("Inventory.Car");
+            pt.PageIndices[0].Key = key;
+
+            db.WritePageTable("Inventory.Car", pt);
+
+            pt = db.ReadPageTable("Inventory.Car");
+            Assert.AreEqual(pt.PageIndices[0].Key, key);
         }
     }
 }
