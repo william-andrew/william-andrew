@@ -40,7 +40,7 @@ namespace MyRM
 
         private string DebuggingInfo
         {
-            get { return " PID=" + this.GetProcessId(); }            
+            get { return " PID=" + this.GetProcessId(); }
         }
 
         private string DatabaseManifestFileName

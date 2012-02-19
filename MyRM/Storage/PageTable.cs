@@ -7,23 +7,39 @@ namespace MyRM.Storage
     {
         public PageIndexEntry[] PageIndices;
 
-        public int PageTableSize = 4096;
-        public int EntrySize = 36 + 4 + 4 + 4;
+        public int PageTableSize = DatabaseFileAccess.DefaultPageSize;
+        public int EntrySize;
+        private readonly int _keySize;
 
-        public PageTable(byte[] data)
+        public PageTable(byte[] data, int pageTableSize = DatabaseFileAccess.DefaultPageSize, int keySize = 36)
         {
+            if (pageTableSize != data.Length)
+            {
+                throw new ArgumentException("invalid PageTable data", "data");
+            }
+
+            PageTableSize = pageTableSize;
+            this._keySize = keySize;
+            this.EntrySize = this._keySize + 12;
+    
             var encoder = new UTF8Encoding();
             PageIndices = new PageIndexEntry[PageTableSize/EntrySize];
 
             for (var i = 0; i < PageTableSize / EntrySize; i++)
             {
-                var pi = new PageIndexEntry();
                 var p = i * EntrySize;
 
-                var keyBuffer = new byte[36];
-                Array.Copy(data, p, keyBuffer,0 , 36);
+                var keyBuffer = new byte[keySize];
+                Array.Copy(data, p, keyBuffer, 0, keySize);
 
-                pi.Key = encoder.GetString(keyBuffer);
+                var pi = new PageIndexEntry
+                             {
+                                 Key = encoder.GetString(keyBuffer),
+                                 PageIndex = BitConverter.ToInt32(data, p + keySize),
+                                 RowIndex = BitConverter.ToInt32(data, p + keySize + 4),
+                                 ShadowId = BitConverter.ToInt32(data, p + keySize + 4 + 4)
+                             };
+
                 PageIndices[i] = pi;
             }
         }
@@ -36,27 +52,19 @@ namespace MyRM.Storage
             for (var i = 0; i < PageTableSize / EntrySize; i++)
             {
                 var p = i * EntrySize;
-                Array.Copy(encoder.GetBytes(PageIndices[i].Key), 0, buffer, p, 36);
+                Array.Copy(encoder.GetBytes(PageIndices[i].Key), 0, buffer, p, _keySize);
 
                 var byteArray = BitConverter.GetBytes(PageIndices[i].PageIndex);
-                Array.Copy(byteArray, 0, buffer, p + 36, 4);
+                Array.Copy(byteArray, 0, buffer, p + _keySize, 4);
 
                 byteArray = BitConverter.GetBytes(PageIndices[i].RowIndex);
-                Array.Copy(byteArray, 0, buffer, p + 36 + 4, 4);
+                Array.Copy(byteArray, 0, buffer, p + _keySize + 4, 4);
 
                 byteArray = BitConverter.GetBytes(PageIndices[i].ShadowId);
-                Array.Copy(byteArray, 0, buffer, p + 36 + 4 + 4, 4);
+                Array.Copy(byteArray, 0, buffer, p + _keySize + 4 + 4, 4);
             }
 
             return buffer;
         }
-    }
-
-    public class PageIndexEntry
-    {
-        public string Key;
-        public int PageIndex;
-        public int RowIndex;
-        public int ShadowId;
     }
 }

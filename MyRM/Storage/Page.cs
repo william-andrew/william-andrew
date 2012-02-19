@@ -3,9 +3,9 @@ using System.Text;
 
 namespace MyRM.Storage
 {
-    //Mark Page Header - {P}{.}{Page Index}{RowSize}{rowsPerPage}{NextFreeRowIndex} 
-    //Rows               {row 0}
-    //Rows               {row n}
+    //Mark Page Header - {P}{.}{Page Index}{RowSize}{rowsPerPage}{NextFreeRowIndex}
+    //Row               {row 0}
+    //Row               {row n}
     public class Page
     {
         //TODO:  ADD LOCKS!!!

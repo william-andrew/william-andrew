@@ -54,9 +54,10 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resource.cs" />
     <Compile Include="SerializationHelper.cs" />
-    <Compile Include="Storage\Index.cs" />
     <Compile Include="Storage\Page.cs" />
+    <Compile Include="Storage\PageIndexEntry.cs" />
     <Compile Include="Storage\PageTable.cs" />
+    <Compile Include="Storage\RecordNotFoundException.cs" />
     <Compile Include="Storage\Row.cs" />
     <Compile Include="TransactionStorage.cs" />
     <Compile Include="TransactionData.cs" />

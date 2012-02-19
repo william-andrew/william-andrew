@@ -1,27 +1,27 @@
-﻿using System.IO;
+﻿using System;
 using System.Text;
-using MyRM;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
 using MyRM.Storage;
+using TP;
 
 namespace TestProject
 {
-    [TestClass()]
+    [TestClass]
     public class DatabaseFileAccessTest
     {
+        readonly UTF8Encoding _encoder = new UTF8Encoding();
 
-        [TestMethod()]
+        [TestMethod]
         public void PageReadWriteTest()
         {
-            var target = new DatabaseFileAccess("foo");
+            var target = new DatabaseFileAccess_Accessor("AAA");
             target.CreateTableFile("Car", 64, 1024, 1024);
 
             var a = target.ReadDataFileHeader("Car", 0);
             var b = target.ReadDataFileHeader("Car", 1);
 
             Page p1 = target.ReadPage("Car", 0, 0);
-            Page p2 = target.ReadPage("Car", 1, 12);
+            Page p2 = target.ReadPage("Car", 12, 1);
 
             var encoder = new UTF8Encoding();
             var byteArray = encoder.GetBytes("Page Data");
@@ -38,11 +38,11 @@ namespace TestProject
             p2.UpdateRow(row, p2.RowsPerPage - 1);
             target.WritePage("Car", p2, p2.ShadowId);
 
-            var p3 = target.ReadPage("Car", 1, 12);
+            var p3 = target.ReadPage("Car", 12, 1);
             Assert.AreEqual("Page Data", encoder.GetString(p3.Row(p3.RowsPerPage - 1).Data, 0, byteArray.Length));
 
             target.WritePage("Car", p3, p3.ShadowId);
-            var p4 = target.ReadPage("Car", 1, 12);
+            var p4 = target.ReadPage("Car", 12, 1);
 
             Assert.AreEqual(p3.NextFreeRowIndex, p4.NextFreeRowIndex);
             Assert.AreEqual(p3.PageIndex, p4.PageIndex);
@@ -55,49 +55,82 @@ namespace TestProject
         [TestMethod]
         public void GetDatabaseManifestTest()
         {
-            var db = new DatabaseFileAccess("Car");
+            var db = new DatabaseFileAccess_Accessor("BBB");
             db.Initialize();
 
-            db.CreateTable("Inventory.Car", 100);
+            const string currentTable = "GetDatabaseManifestTest";
+
             db.CreateTable("Inventory.Room", 64);
+            db.CreateTable(currentTable, 100);
 
             db.ReadDatabaseManifest();
             Assert.AreEqual(2, db.Tables.Length);
 
-            var encoder = new UTF8Encoding();
-            var byteArray = encoder.GetBytes("Page Data");
-
-            var page0 = db.ReadPage("Inventory.Car", 1);
-            var row = new Row(page0.RowSize);
+            var page = db.ReadPage(currentTable, 0, 0);
+            var row = new Row(page.RowSize);
+            var byteArray = _encoder.GetBytes("Page Data");
             Array.Copy(byteArray, row.Data, byteArray.Length);
-            page0.UpdateRow(row, 8);
-            db.WritePage("Inventory.Car", page0);
+            page.UpdateRow(row, 8); //p0r8
 
-            var page1 = db.ReadPage("Inventory.Car", 1, 1);
-            Assert.AreEqual("Page Data", encoder.GetString(page1.Row(8).Data, 0, byteArray.Length));
+            var pt = db.ReadPageTable(currentTable, 0);
+            var key = Guid.NewGuid().ToString();
+            pt.PageIndices[5] = new PageIndexEntry
+                                    {
+                                        Key = key,
+                                        PageIndex = page.PageIndex,
+                                        RowIndex = 1,
+                                        ShadowId = page.ShadowId
+                                    };
 
-            db.CommitPage("Inventory.Car", page0);
+            db.WritePageTable(currentTable, pt, 0);
 
-            var page2 = db.ReadPage("Inventory.Car", 1);
-            Assert.AreEqual("Page Data", encoder.GetString(page2.Row(8).Data, 0, byteArray.Length));
+            var tid = new Transaction();
+            var activeId = db.WritePage(tid, currentTable, key, page); //write into shadow
 
+            var page1 = db.ReadPage(currentTable, 0, 1);
+            Assert.AreEqual("Page Data", _encoder.GetString(page1.Row(8).Data, 0, byteArray.Length));
+
+            db.CommitPage(tid, currentTable, page, activeId);
+
+            var page2 = db.ReadPage(currentTable, key);
+            Assert.AreEqual("Page Data", _encoder.GetString(page2.Row(8).Data, 0, byteArray.Length));
         }
 
         [TestMethod]
         public void ReadPageTable()
         {
-            var db = new DatabaseFileAccess("Car");
+            var db = new DatabaseFileAccess_Accessor("CCC");
             db.Initialize();
             var key = Guid.NewGuid().ToString();
 
+            const int pageIndex = 100;
+            const int rowIndex = 99;
+            const int shadowId = 1;
+
             db.CreateTable("Inventory.Car", 100);
-            PageTable pt = db.ReadPageTable("Inventory.Car");
+            PageTable pt = db.ReadPageTable("Inventory.Car", 0);
             pt.PageIndices[0].Key = key;
+            pt.PageIndices[0].PageIndex = pageIndex;
+            pt.PageIndices[0].RowIndex = rowIndex;
+            pt.PageIndices[0].ShadowId = shadowId;
 
-            db.WritePageTable("Inventory.Car", pt);
+            db.WritePageTable("Inventory.Car", pt, 1);
 
-            pt = db.ReadPageTable("Inventory.Car");
+            pt = db.ReadPageTable("Inventory.Car", 1);
             Assert.AreEqual(pt.PageIndices[0].Key, key);
+            Assert.AreEqual(pt.PageIndices[0].PageIndex, pageIndex);
+            Assert.AreEqual(pt.PageIndices[0].RowIndex, rowIndex);
+            Assert.AreEqual(pt.PageIndices[0].ShadowId, shadowId);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(RecordNotFoundException))]
+        public void ReadPageRecordNotFound()
+        {
+            var db = new DatabaseFileAccess_Accessor("DDD");
+            db.Initialize();
+            db.CreateTable("Inventory.Car", 100);
+            db.ReadPage("Inventory.Car", "key");
         }
     }
 }

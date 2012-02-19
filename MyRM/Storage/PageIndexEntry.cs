@@ -1,9 +1,10 @@
 namespace MyRM.Storage
 {
-    public class Index
+    public class PageIndexEntry
     {
+        public string Key;
         public int PageIndex;
-        public int ShadowId;
         public int RowIndex;
+        public int ShadowId;
     }
 }

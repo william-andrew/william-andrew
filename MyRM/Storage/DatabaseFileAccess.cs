@@ -5,22 +5,18 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
+using TP;
 
 namespace MyRM.Storage
 {
-
-    //TODO: ADD LOCKS
-    //TODO: ADD HASH INDEX 
-    //TODO: INTEGRATE WITH CALLER!!
     public class DatabaseFileAccess
     {
-        private const int DefaultPageSize = 4096;
+        public const int DefaultPageSize = 4096;
         private const int DefaultPageNumber = 1024;
         public const int DefaultPageHeaderSize = 64;
         private const int DataFileHeaderSize = 512;
 
         private readonly string _databaseName;
-        private string _filePath;
         private bool _isInitialized;
         private Dictionary<string, int> _tables = new Dictionary<string, int>();
 
@@ -29,24 +25,9 @@ namespace MyRM.Storage
             _databaseName = databaseName;
         }
 
-        public string FilePath
-        {
-            get { return _filePath; }
-        }
-
         public string DatabaseName
         {
             get { return _databaseName; }
-        }
-
-        private string DatabaseManifestFileName
-        {
-            get { return DatabaseName + @".manifest"; }
-        }
-
-        private string DebuggingInfo
-        {
-            get { return " PID=" + GetProcessId(); }
         }
 
         public string[] Tables
@@ -78,6 +59,183 @@ namespace MyRM.Storage
             _isInitialized = true;
         }
 
+        public bool ContainsTable(string tableName)
+        {
+            return _tables.ContainsKey(tableName);
+        }
+
+        public void CreateTable(string tableName, int rowSize, int keySize = 36)
+        {
+            EnsureInitialized();
+
+            lock (_tables)
+            {
+                if (!ContainsTable(tableName))
+                {
+                    _tables.Add(tableName, 0);
+                    CreateTableFile(tableName, rowSize);
+                    CreatePageTable(tableName, keySize);
+                    WriteDatabaseManifest();
+                }
+            }
+        }
+
+        public void InsertRecord(Transaction tid, string tableName, string key, Row record)
+        {
+
+        }
+
+        public void UpdateRecord(Transaction tid, string tableName, string key, Row record)
+        {
+
+        }
+
+        public void DeleteRecord(Transaction tid, string tableName, string key, Row record)
+        {
+
+        }
+
+        public void Commit(Transaction tid)
+        {
+        
+        }
+
+        /// <summary>
+        /// Write page into the shadow and create an updated page tableName for it
+        /// </summary>
+        public int WritePage(Transaction tid, string tableName, string key, Page page)
+        {
+            if (page.TableName != tableName)
+                throw new ArgumentException("page deson't below to the tableName");
+
+            //shadow id of the index tableName
+            var shadowId = _tables[tableName];
+
+            //read active page tableName
+            var pageTable = this.ReadPageTable(tableName, shadowId);
+
+            //modify page tableName
+            var pageTableIndex = (from k in pageTable.PageIndices where k.Key == key select k).Single();
+            pageTableIndex.ShadowId = pageTableIndex.ShadowId == 0 ? 1 : 0;
+
+            if (pageTableIndex.PageIndex != page.PageIndex)
+                throw new ApplicationException("index doesn't match the page");
+
+            //save page into shadow
+            WritePage(tableName, page, pageTableIndex.ShadowId);
+
+            //save page tableName file
+            WritePageTable(tableName, pageTable, shadowId == 0 ? 1: 0);
+
+            return pageTableIndex.ShadowId;
+        }
+
+        public Page ReadPage(string tableName, string key)
+        {
+            //shadow id of the index tableName
+            var shadowId = _tables[tableName];
+
+            //read active page tableName
+            var pageTable = this.ReadPageTable(tableName, shadowId);
+            var pageTableIndex = (from k in pageTable.PageIndices where k.Key == key select k).SingleOrDefault();
+
+            if (pageTableIndex == null)
+                throw new RecordNotFoundException(key);
+
+            return ReadPage(tableName, pageTableIndex.PageIndex, pageTableIndex.ShadowId);
+        }
+
+        public void CommitPage(Transaction tid, string tableName, Page page, int shadowId)
+        {
+            if (!page.IsDirty)
+                return;
+
+            _tables[tableName] = shadowId;
+
+            WriteDatabaseManifest();
+        }
+
+        private Page ReadPage(string tableName, int pageIndex, int shadowId)
+        {
+            string filename = tableName + ".data." + shadowId;
+            DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, shadowId);
+
+            if (pageIndex >= tableDataFileHeader.PageNum)
+                throw new ApplicationException("pageIndex");
+
+            var p = new Page
+            {
+                ShadowId = shadowId,
+                PageIndex = pageIndex,
+                PageSize = tableDataFileHeader.PageSize,
+                TableName = tableName,
+                DataFileName = filename,
+            };
+
+            using (var fileStream = new FileStream(filename, FileMode.Open))
+            {
+                fileStream.Seek(DataFileHeaderSize + pageIndex * p.PageSize, SeekOrigin.Begin);
+                var pageData = new byte[p.PageSize];
+                fileStream.Read(pageData, 0, p.PageSize);
+                p.Decode(pageData);
+            }
+
+            return p;
+        }
+
+        private void WritePage(string tableName, Page page, int shadowId)
+        {
+            string filename = page.TableName + ".data." + shadowId;
+            DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, page.ShadowId);
+
+            if (page.PageIndex >= tableDataFileHeader.PageNum)
+                throw new ApplicationException("pageIndex");
+
+            page.ShadowId = shadowId;
+            using (var fileStream = new FileStream(filename, FileMode.Open))
+            {
+                fileStream.Seek(DataFileHeaderSize + page.PageIndex * page.PageSize, SeekOrigin.Begin);
+                byte[] pageData = page.Encode();
+                fileStream.Write(pageData, 0, page.PageSize);
+            }
+        }
+
+        private PageTable ReadPageTable(string tableName, int shadowId)
+        {
+            string filename = tableName + ".index." + shadowId;
+            using (var fileStream = new FileStream(filename, FileMode.OpenOrCreate))
+            {
+                var buffer = new byte[DefaultPageSize];
+                fileStream.Seek(0, SeekOrigin.Begin);
+                fileStream.Read(buffer, 0, buffer.Length);
+                return new PageTable(buffer);
+            }
+        }
+
+        private void WritePageTable(string tableName, PageTable pt, int shadowId)
+        {
+            string filename = tableName + ".index." + shadowId;
+
+            using (var fileStream = new FileStream(filename, FileMode.OpenOrCreate))
+            {
+                var pageTable = pt.GetBytes();
+                fileStream.Seek(0, SeekOrigin.Begin);
+                fileStream.Write(pageTable, 0, pageTable.Length);
+                fileStream.Flush();
+            }
+        }
+
+        private void CreatePageTable(string tableName, int keySize)
+        {
+            string filename = tableName + ".index." + 0;
+
+            if (File.Exists(filename))
+                return;
+
+            var pt = new PageTable(new byte[DefaultPageSize], DefaultPageSize, keySize);
+            WritePageTable(tableName, pt, 0);
+        }
+
         private void BuildNewDatabase()
         {
             WriteDatabaseManifest();
@@ -95,7 +253,17 @@ namespace MyRM.Storage
             return currentProcess.Id;
         }
 
-        public void ReadDatabaseManifest()
+        private string DatabaseManifestFileName
+        {
+            get { return DatabaseName + @".manifest"; }
+        }
+
+        private string DebuggingInfo
+        {
+            get { return " PID=" + GetProcessId(); }
+        }
+
+        private void ReadDatabaseManifest()
         {
             if (!File.Exists(DatabaseManifestFileName))
             {
@@ -109,26 +277,7 @@ namespace MyRM.Storage
             _tables = tables;
         }
 
-        private void RecoverDatabase()
-        {
-            if (File.Exists(DatabaseManifestFileName + ".tmp"))
-                File.Move(DatabaseManifestFileName + ".tmp", DatabaseManifestFileName);
-            else if (File.Exists(DatabaseManifestFileName + ".bak"))
-                File.Move(DatabaseManifestFileName + ".bak", DatabaseManifestFileName);
-        }
-
-        private bool IsRecoverable()
-        {
-            return (File.Exists(DatabaseManifestFileName + ".tmp") ||
-                    File.Exists(DatabaseManifestFileName + ".bak"));
-        }
-
-        public bool ContainsTable(string tableName)
-        {
-            return _tables.ContainsKey(tableName);
-        }
-
-        public void WriteDatabaseManifest()
+        private void WriteDatabaseManifest()
         {
             var xdoc = new XDocument();
             var root = new XElement("Tables");
@@ -153,80 +302,35 @@ namespace MyRM.Storage
             }
         }
 
-        public void WritePage(string tableName, Page page)
+        private void RecoverDatabase()
         {
-            var shadowId = _tables[tableName] == 0 ? 1 :0;
-            WritePage(tableName, page, shadowId);
+            if (File.Exists(DatabaseManifestFileName + ".tmp"))
+                File.Move(DatabaseManifestFileName + ".tmp", DatabaseManifestFileName);
+            else if (File.Exists(DatabaseManifestFileName + ".bak"))
+                File.Move(DatabaseManifestFileName + ".bak", DatabaseManifestFileName);
         }
 
-        public void WritePage(string tableName, Page page, int shadowId)
+        private bool IsRecoverable()
         {
-            string filename = page.TableName + ".data." + shadowId;
-            DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, page.ShadowId);
-
-            if (page.PageIndex >= tableDataFileHeader.PageNum)
-                throw new ApplicationException("pageIndex");
-
-            page.ShadowId = shadowId;
-            using (var fileStream = new FileStream(filename, FileMode.Open))
-            {
-                fileStream.Seek(DataFileHeaderSize + page.PageIndex*page.PageSize, SeekOrigin.Begin);
-                byte[] pageData = page.Encode();
-                fileStream.Write(pageData, 0, page.PageSize);
-            }
+            return (File.Exists(DatabaseManifestFileName + ".tmp") ||
+                    File.Exists(DatabaseManifestFileName + ".bak"));
         }
 
-        public Page ReadPage(string tableName, int pageIndex)
+        private void CreateTableFile(string tableName, int rowSize, int pageSize = DefaultPageSize, int pageNum = DefaultPageNumber)
         {
-            var shadowId = _tables[tableName];
-            return ReadPage(tableName, shadowId, pageIndex);
-        }
-
-        public Page ReadPage(string tableName, int shadowId, int pageIndex)
-        {
-            string filename = tableName + ".data." + shadowId;
-            DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, shadowId);
-
-            if (pageIndex >= tableDataFileHeader.PageNum)
-                throw new ApplicationException("pageIndex");
-
-            var p = new Page
-                        {
-                            ShadowId = shadowId,
-                            PageIndex = pageIndex,
-                            PageSize = tableDataFileHeader.PageSize,
-                            TableName = tableName,
-                            DataFileName = filename,
-                        };
-
-            using (var fileStream = new FileStream(filename, FileMode.Open))
-            {
-                fileStream.Seek(DataFileHeaderSize + pageIndex*p.PageSize, SeekOrigin.Begin);
-                var pageData = new byte[p.PageSize];
-                fileStream.Read(pageData, 0, p.PageSize);
-                p.Decode(pageData);
-            }
-
-            return p;
-        }
-
-        public string CreateTableFile(string tableName, int rowSize, int pageSize = DefaultPageSize,
-                                      int pageNum = DefaultPageNumber)
-        {
-            String activeFileName = null;
             for (int j = 0; j <= 1; j++)
             {
                 string filename = tableName + ".data." + j;
 
-                if (j == 0)
-                    activeFileName = filename;
+                if (File.Exists(filename))
+                    continue;
 
                 var databaseHeader = new DataFileHeader
-                                         {
-                                             PageNum = pageNum,
-                                             PageSize = pageSize,
-                                             Version = 1
-                                         };
+                {
+                    PageNum = pageNum,
+                    PageSize = pageSize,
+                    Version = 1
+                };
 
                 var databaseHeaderBuffer = new byte[DataFileHeaderSize];
                 byte[] binaryHeader = SerializationHelper.ObjectToByteArray(databaseHeader);
@@ -240,13 +344,13 @@ namespace MyRM.Storage
                     fileStream.Flush();
                 }
 
-                int rowsPerPage = (pageSize - DefaultPageHeaderSize)/rowSize;
+                int rowsPerPage = (pageSize - DefaultPageHeaderSize) / rowSize;
 
                 using (var fileStream = new FileStream(filename, FileMode.Open))
                 {
                     for (int i = 0; i < pageNum; i++)
                     {
-                        fileStream.Seek(DataFileHeaderSize + i*pageSize, SeekOrigin.Begin);
+                        fileStream.Seek(DataFileHeaderSize + i * pageSize, SeekOrigin.Begin);
 
                         //Mark Page Header - {P}{.}{Page Index}{RowSize}{rowsPerPage}{NextFreeRowIndex} 
                         var encoder = new UTF8Encoding();
@@ -270,11 +374,9 @@ namespace MyRM.Storage
                     }
                 }
             }
-
-            return activeFileName;
         }
 
-        public DataFileHeader ReadDataFileHeader(string tableName, int shadowId)
+        private DataFileHeader ReadDataFileHeader(string tableName, int shadowId)
         {
             string filename = tableName + ".data." + shadowId;
             using (var fileStream = new FileStream(filename, FileMode.Open))
@@ -283,58 +385,7 @@ namespace MyRM.Storage
                 fileStream.Seek(0, SeekOrigin.Begin);
                 fileStream.Read(buffer, 0, DataFileHeaderSize);
                 object obj = SerializationHelper.ByteArrayToObject(buffer);
-                return (DataFileHeader) obj;
-            }
-        }
-
-        public void CreateTable(string table, int rowSize)
-        {
-            EnsureInitialized();
-
-            lock (_tables)
-            {
-                if (!ContainsTable(table))
-                {
-                    string f = CreateTableFile(table, rowSize);
-
-                    _tables.Add(table, 0);
-                    WriteDatabaseManifest();
-                }
-            }
-        }
-
-        public void CommitPage(string tableName, Page page)
-        {
-            if (!page.IsDirty)
-                return;
-
-            _tables[tableName] = page.ShadowId;
-
-            WriteDatabaseManifest();
-        }
-
-        public PageTable ReadPageTable(string tableName)
-        {
-            string filename = tableName + ".index." + _tables[tableName];
-            using (var fileStream = new FileStream(filename, FileMode.OpenOrCreate))
-            {
-                //TODO: FIX THIS
-                var buffer = new byte[4096];
-                fileStream.Seek(0, SeekOrigin.Begin);
-                fileStream.Read(buffer, 0, buffer.Length);
-                return new PageTable(buffer);
-            }
-        }
-
-        public void WritePageTable(string tableName, PageTable pt)
-        {
-            string filename = tableName + ".index." + _tables[tableName];
-            using (var fileStream = new FileStream(filename, FileMode.OpenOrCreate))
-            {
-                //TODO: FIX THIS
-                var buffer = new byte[4096];
-                fileStream.Seek(0, SeekOrigin.Begin);
-                fileStream.Write(pt.GetBytes(), 0, buffer.Length);
+                return (DataFileHeader)obj;
             }
         }
     }
