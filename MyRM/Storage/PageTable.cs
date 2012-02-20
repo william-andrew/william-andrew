@@ -66,5 +66,26 @@ namespace MyRM.Storage
 
             return buffer;
         }
+
+        //TODO: ADD a lock
+        public void InsertIndex(string key, int pageId, int rowId, int pageShowdowId)
+        {
+            bool isDone = false;
+            foreach(var item in this.PageIndices)
+            {
+                if (item.Key[0] == 0)
+                {
+                    item.Key = key;
+                    item.PageIndex = pageId;
+                    item.RowIndex = rowId;
+                    item.ShadowId = pageShowdowId;
+                    isDone = true;
+                    break;
+                }
+            }
+
+            if (!isDone)
+                throw new ApplicationException("run out of index space");
+        }
     }
 }

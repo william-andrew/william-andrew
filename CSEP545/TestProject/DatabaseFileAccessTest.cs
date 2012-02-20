@@ -132,5 +132,45 @@ namespace TestProject
             db.CreateTable("Inventory.Car", 100);
             db.ReadPage("Inventory.Car", "key");
         }
+
+        [TestMethod]
+        public void InsertRecord()
+        {
+            var db = new DatabaseFileAccess_Accessor("EEE");
+            db.Initialize();
+            var key1 = Guid.NewGuid().ToString();
+            var key2 = Guid.NewGuid().ToString();
+            var key3 = Guid.NewGuid().ToString();
+
+            var encoder = new UTF8Encoding();
+
+            db.CreateTable("Inventory.Car", 100);
+            db.InsertRecord(null, "Inventory.Car", key1, new Row
+            {
+                Data = encoder.GetBytes("SEATTLE, 123")
+            });
+
+            var row = db.ReadRecord(null, "Inventory.Car", key1);
+            Assert.AreEqual("SEATTLE, 123", row.DataString);
+
+            db.InsertRecord(null, "Inventory.Car", key2, new Row
+            {
+                Data = encoder.GetBytes("New York, 123")
+            });
+
+            db.InsertRecord(null, "Inventory.Car", key3, new Row
+            {
+                Data = encoder.GetBytes("London, 567")
+            });
+
+            row = db.ReadRecord(null, "Inventory.Car", key1);
+            Assert.AreEqual("SEATTLE, 123", row.DataString);
+
+            row = db.ReadRecord(null, "Inventory.Car", key2);
+            Assert.AreEqual("New York, 123", row.DataString);
+
+            //row = db.ReadRecord(null, "Inventory.Car", key3);
+            //Assert.AreEqual("London, 567", row.DataString);
+        }
     }
 }

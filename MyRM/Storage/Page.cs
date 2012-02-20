@@ -30,11 +30,12 @@ namespace MyRM.Storage
 
         public bool IsDirty { get; set; }
 
-        public void InsertRow(Row row)
+        public int InsertRow(Row row)
         {
+            var rowId = NextFreeRowIndex++;
             IsDirty = true;
-            Array.Copy(row.Data, _rows[NextFreeRowIndex].Data, RowSize);
-            NextFreeRowIndex++;
+            Array.Copy(row.Data, _rows[rowId].Data, row.Data.Length < RowSize ? row.Data.Length : RowSize);
+            return rowId;
         }
 
         public void UpdateRow(Row row, int index)

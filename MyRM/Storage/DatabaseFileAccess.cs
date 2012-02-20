@@ -20,6 +20,8 @@ namespace MyRM.Storage
         private bool _isInitialized;
         private Dictionary<string, int> _tables = new Dictionary<string, int>();
 
+        private static readonly object DatabaseLock = new object();
+
         public DatabaseFileAccess(string databaseName)
         {
             _databaseName = databaseName;
@@ -42,21 +44,27 @@ namespace MyRM.Storage
 
         public void Initialize(bool autoRecovery = true)
         {
-            if (File.Exists(DatabaseManifestFileName))
-                ReadDatabaseManifest();
-            else
+            lock (DatabaseLock)
             {
-                if (IsRecoverable())
+                if (File.Exists(DatabaseManifestFileName))
                 {
-                    if (autoRecovery)
-                        RecoverDatabase();
-                    else
-                        throw new ApplicationException("The database " + DatabaseName + " requires recovery." +
-                                                       DebuggingInfo);
+                    ReadDatabaseManifest();
                 }
-                BuildNewDatabase();
+                else
+                {
+                    if (IsRecoverable())
+                    {
+                        if (autoRecovery)
+                            RecoverDatabase();
+                        else
+                            throw new ApplicationException("The database " + DatabaseName + " requires recovery." +
+                                                           DebuggingInfo);
+                    }
+                    BuildNewDatabase();
+                }
+
+                _isInitialized = true;
             }
-            _isInitialized = true;
         }
 
         public bool ContainsTable(string tableName)
@@ -68,7 +76,7 @@ namespace MyRM.Storage
         {
             EnsureInitialized();
 
-            lock (_tables)
+            lock (DatabaseLock)
             {
                 if (!ContainsTable(tableName))
                 {
@@ -82,7 +90,47 @@ namespace MyRM.Storage
 
         public void InsertRecord(Transaction tid, string tableName, string key, Row record)
         {
+            //shadow id of the index tableName
+            var shadowId = _tables[tableName];
 
+            //read active page tableName
+            var pageTable = this.ReadPageTable(tableName, shadowId);
+
+            //modify page tableName
+            if ((from k in pageTable.PageIndices where k.Key == key select k).Any())
+                throw new ApplicationException("duplicate key");
+
+            //find an empty page
+            Page page = null;
+            //TODO: fix this algorithm
+            foreach(var item in pageTable.PageIndices)
+            {
+                page = ReadPage(tableName, item.PageIndex, item.ShadowId);
+                if (page.NextFreeRowIndex <= page.RowsPerPage)
+                {
+                    break;
+                }
+                page = null;
+            }
+
+            if (page == null)
+                throw new ApplicationException("out of space");
+
+            var rowId = page.InsertRow(record);
+            page.ShadowId = page.ShadowId == 0 ? 1 : 0;
+
+            //update page table
+            pageTable.InsertIndex(key, page.PageIndex, rowId, page.ShadowId);
+
+            //write page into the shawdow
+            WritePage(tableName, page, page.ShadowId);
+
+            //save page tableName file
+            WritePageTable(tableName, pageTable, shadowId == 0 ? 1 : 0);
+
+
+            //TODO: NOT COMMIT HERE
+            CommitPage(tid, tableName, page, shadowId == 0 ? 1 : 0);
         }
 
         public void UpdateRecord(Transaction tid, string tableName, string key, Row record)
@@ -90,14 +138,33 @@ namespace MyRM.Storage
 
         }
 
-        public void DeleteRecord(Transaction tid, string tableName, string key, Row record)
+        public void DeleteRecord(Transaction tid, string tableName, string key)
         {
 
         }
 
+        public Row ReadRecord(Transaction tid, string tableName, string key)
+        {
+            //shadow id of the index tableName
+            var shadowId = _tables[tableName];
+
+            //get active page table based on the shadow id
+            var pt = ReadPageTable(tableName, shadowId);
+
+            var index = (from item in pt.PageIndices where item.Key == key select item).SingleOrDefault();
+            
+            if (index == null)
+                throw new ApplicationException("record not found");
+
+            var page = ReadPage(tableName, index.PageIndex, index.ShadowId);
+            return page.Row(index.RowIndex);
+        }
+
         public void Commit(Transaction tid)
         {
-        
+            // flush dirty pages 
+            // remove the dirty pages in memory
+            // forget transaction
         }
 
         /// <summary>
