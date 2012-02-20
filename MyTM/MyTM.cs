@@ -285,7 +285,7 @@ namespace MyTM
         }
 
 
-
+        //http://archive.devx.com/java/free/articles/dd_jta/jta-2.asp
         public void OnRmPrepared(Transaction context, string rm)
         {
             throw new NotImplementedException();

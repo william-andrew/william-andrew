@@ -573,10 +573,8 @@ namespace MyRM
         }
 
 
-
-
-
-
+        //we can take a look the standard XA/Open interface.
+        //http://archive.devx.com/java/free/articles/dd_jta/jta-2.asp
         public void NofifyPrepare(Transaction context)
         {
             throw new NotImplementedException();
