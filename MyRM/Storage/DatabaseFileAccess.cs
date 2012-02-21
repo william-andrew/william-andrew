@@ -105,6 +105,9 @@ namespace MyRM.Storage
             //TODO: fix this algorithm
             foreach(var item in pageTable.PageIndices)
             {
+                if (item.ShadowId != shadowId)
+                    continue;
+
                 page = ReadPage(tableName, item.PageIndex, item.ShadowId);
                 if (page.NextFreeRowIndex <= page.RowsPerPage)
                 {
@@ -128,14 +131,40 @@ namespace MyRM.Storage
             //save page tableName file
             WritePageTable(tableName, pageTable, shadowId == 0 ? 1 : 0);
 
-
             //TODO: NOT COMMIT HERE
             CommitPage(tid, tableName, page, shadowId == 0 ? 1 : 0);
         }
 
         public void UpdateRecord(Transaction tid, string tableName, string key, Row record)
         {
+            //shadow id of the index tableName
+            var shadowId = _tables[tableName];
 
+            //read active page tableName
+            var pageTable = this.ReadPageTable(tableName, shadowId);
+
+            //modify page tableName
+            var index = (from item in pageTable.PageIndices where item.Key == key select item).SingleOrDefault();
+
+            if (index == null)
+                throw new ApplicationException("record not found");
+
+            var page = ReadPage(tableName, index.PageIndex, index.ShadowId);
+
+            page.UpdateRow(record, index.RowIndex);
+            page.ShadowId = page.ShadowId == 0 ? 1 : 0;
+
+            //write page into the shawdow
+            WritePage(tableName, page, page.ShadowId);
+
+            //update page table index 
+            index.ShadowId = page.ShadowId;
+
+            //save page tableName file
+            WritePageTable(tableName, pageTable, shadowId == 0 ? 1 : 0);
+
+            //TODO: NOT COMMIT HERE
+            CommitPage(tid, tableName, page, shadowId == 0 ? 1 : 0);
         }
 
         public void DeleteRecord(Transaction tid, string tableName, string key)

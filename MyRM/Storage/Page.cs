@@ -40,8 +40,8 @@ namespace MyRM.Storage
 
         public void UpdateRow(Row row, int index)
         {
-            IsDirty = true;           
-            Array.Copy(row.Data, _rows[index].Data, RowSize);
+            IsDirty = true;
+            Array.Copy(row.Data, _rows[index].Data, row.Data.Length < RowSize ? row.Data.Length : RowSize);
         }
 
         public void Decode(byte[] pageData)

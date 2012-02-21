@@ -134,43 +134,86 @@ namespace TestProject
         }
 
         [TestMethod]
-        public void InsertRecord()
+        public void InsertUpdateRecord()
         {
             var db = new DatabaseFileAccess_Accessor("EEE");
             db.Initialize();
-            var key1 = Guid.NewGuid().ToString();
-            var key2 = Guid.NewGuid().ToString();
-            var key3 = Guid.NewGuid().ToString();
+            var key1 = new string('1', 36);
+            var key2 = new string('2', 36);
+            var key3 = new string('3', 36);
+            var key4 = new string('4', 36);
 
             var encoder = new UTF8Encoding();
 
             db.CreateTable("Inventory.Car", 100);
             db.InsertRecord(null, "Inventory.Car", key1, new Row
             {
-                Data = encoder.GetBytes("SEATTLE, 123")
+                Data = encoder.GetBytes("Seattle, 123")
             });
 
             var row = db.ReadRecord(null, "Inventory.Car", key1);
-            Assert.AreEqual("SEATTLE, 123", row.DataString);
+            Assert.AreEqual("Seattle, 123", row.DataString);
 
             db.InsertRecord(null, "Inventory.Car", key2, new Row
             {
-                Data = encoder.GetBytes("New York, 123")
+                Data = encoder.GetBytes("New York, 456")
             });
 
             db.InsertRecord(null, "Inventory.Car", key3, new Row
             {
-                Data = encoder.GetBytes("London, 567")
+                Data = encoder.GetBytes("London, 789")
+            });
+
+            db.InsertRecord(null, "Inventory.Car", key4, new Row
+            {
+                Data = encoder.GetBytes("Phoenix, 012")
             });
 
             row = db.ReadRecord(null, "Inventory.Car", key1);
-            Assert.AreEqual("SEATTLE, 123", row.DataString);
+            Assert.AreEqual("Seattle, 123", row.DataString);
 
             row = db.ReadRecord(null, "Inventory.Car", key2);
-            Assert.AreEqual("New York, 123", row.DataString);
+            Assert.AreEqual("New York, 456", row.DataString);
 
-            //row = db.ReadRecord(null, "Inventory.Car", key3);
-            //Assert.AreEqual("London, 567", row.DataString);
-        }
+            row = db.ReadRecord(null, "Inventory.Car", key3);
+            Assert.AreEqual("London, 789", row.DataString);
+
+            row = db.ReadRecord(null, "Inventory.Car", key4);
+            Assert.AreEqual("Phoenix, 012", row.DataString);
+
+            // Update
+            db.UpdateRecord(null, "Inventory.Car", key1, new Row
+            {
+                Data = encoder.GetBytes("Seattle, key1")
+            });
+
+            row = db.ReadRecord(null, "Inventory.Car", key1);
+            Assert.AreEqual("Seattle, key1", row.DataString);
+
+            db.UpdateRecord(null, "Inventory.Car", key2, new Row
+            {
+                Data = encoder.GetBytes("New York, key2")
+            });
+
+            row = db.ReadRecord(null, "Inventory.Car", key2);
+            Assert.AreEqual("New York, key2", row.DataString);
+
+            db.UpdateRecord(null, "Inventory.Car", key3, new Row
+            {
+                Data = encoder.GetBytes("London, key3")
+            });
+
+            row = db.ReadRecord(null, "Inventory.Car", key3);
+            Assert.AreEqual("London, key3", row.DataString);
+
+            db.UpdateRecord(null, "Inventory.Car", key4, new Row
+            {
+                Data = encoder.GetBytes("Phoenix, key4")
+            });
+
+            row = db.ReadRecord(null, "Inventory.Car", key4);
+            Assert.AreEqual("Phoenix, key4", row.DataString);
+
+        } 
     }
 }
