@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace MyRM.Storage
@@ -86,6 +87,21 @@ namespace MyRM.Storage
 
             if (!isDone)
                 throw new ApplicationException("run out of index space");
+        }
+
+        internal void RemoveIndex(PageIndexEntry index)
+        {
+            //TODO: reclaim the slot
+            foreach (var item in this.PageIndices)
+            {
+                if (item.Key == index.Key)
+                {
+                    item.Key = new string('\0', this._keySize);
+                    item.PageIndex = 0;
+                    item.RowIndex = 0;
+                    item.ShadowId = 0;
+                }
+            }
         }
     }
 }

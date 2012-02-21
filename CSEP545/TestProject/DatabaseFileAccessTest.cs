@@ -214,6 +214,26 @@ namespace TestProject
             row = db.ReadRecord(null, "Inventory.Car", key4);
             Assert.AreEqual("Phoenix, key4", row.DataString);
 
+            db.DeleteRecord(null, "Inventory.Car", key4);
+
+            try
+            {
+                row = db.ReadRecord(null, "Inventory.Car", key4);
+                Assert.Fail();
+            }
+            catch(ApplicationException e)
+            {
+                Assert.AreEqual("record not found", e.Message);
+            }
+
+            row = db.ReadRecord(null, "Inventory.Car", key1);
+            Assert.AreEqual("Seattle, key1", row.DataString);
+
+            row = db.ReadRecord(null, "Inventory.Car", key2);
+            Assert.AreEqual("New York, key2", row.DataString);
+
+            row = db.ReadRecord(null, "Inventory.Car", key3);
+            Assert.AreEqual("London, key3", row.DataString);
         } 
     }
 }
