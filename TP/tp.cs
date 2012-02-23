@@ -214,20 +214,6 @@ namespace TP
 		/// </summary>
 		/// <param name="rm"></param>
         void Register(string rm);
-
-        /// <summary>
-        /// For rm to call to tell TM that RM is prepared.
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="rm"></param>
-        void OnRmPrepared(Transaction context, string rm);
-    
-        /// <summary>
-        /// For rm to call to tell TM that RM is done.
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="rm"></param>
-        void OnRmDone(Transaction context, string rm);
     }
 
 	/// <summary>
@@ -276,6 +262,15 @@ namespace TP
 
 	}
 
+    public enum XaResponse
+    {
+        XA_OK,
+        XAER_PROTO,  // something wrong with protocol
+        XA_RBROLLBACK, //The resource manager rolled back the transaction branch for an unspecified reason.
+        XA_RBCOMMFAIL, //A communication failure occurred within the resource manager
+        XAER_RMERR, // something wrong
+        XA_RETRY, // need to retry 
+    }
 	/// <summary>
 	/*   Resource Manager Interface */
 	/// </summary>
@@ -293,10 +288,17 @@ namespace TP
  		void Enlist(Transaction context);
 
 		/// <param name="context"></param>
-		void Commit(Transaction context);
+        XaResponse Commit(Transaction context);
 
 		/// <param name="context"></param>
-		void Abort(Transaction context);
+        XaResponse Abort(Transaction context);
+
+        /// <summary>
+        /// For TM to call RM to get prepare.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="rm"></param>
+        XaResponse Prepare(Transaction context);
 	
 		/// <summary>
 		/*   Add "count" items 
@@ -402,26 +404,5 @@ namespace TP
 		/// </summary>
 		/// <param name="diskWritesToWait"></param>
 		void SelfDestruct(int diskWritesToWait);
-
-        /// <summary>
-        /// For TM to call RM to get prepare.
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="rm"></param>
-        void NofifyPrepare(Transaction context);
-
-        /// <summary>
-        /// For TM to call RM to get done.
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="rm"></param>
-        void NotifyCommit(Transaction context);
-
-        /// <summary>
-        /// For TM to call RM to abort.
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="rm"></param>
-        void NotifyAbort(Transaction context);
     }
 }

@@ -191,24 +191,32 @@ namespace MyRM
         /// Currently does not involve TM, will do it in later step
         /// </summary>
         /// <param name="context"></param>
-        public void Commit(TP.Transaction context)
+        public XaResponse Commit(TP.Transaction context)
         {
             // transactionManager.Commit(context);
             TransactionStorage.Commit(context);
             lockManager.UnlockAll(context);
+            return XaResponse.XA_OK;
         }
 
         /// <summary>
         /// Currently does not involve TM, will do it in later step
         /// </summary>
         /// <param name="context"></param>
-        public void Abort(TP.Transaction context)
+        public XaResponse Abort(TP.Transaction context)
         {
             // transactionManager.Abort(context);
             TransactionStorage.Abort(context);
             lockManager.UnlockAll(context);
+            return XaResponse.XA_OK;
         }
 
+
+        //we can take a look the standard XA/Open interface.
+        public XaResponse Prepare(Transaction context)
+        {
+            throw new NotImplementedException();
+        }
 
         /// <summary>
         /// implemented using the new TransactionStorage class
@@ -572,23 +580,5 @@ namespace MyRM
             // TODO deadlock detector, retry timeout
         }
 
-
-        //we can take a look the standard XA/Open interface.
-        //http://archive.devx.com/java/free/articles/dd_jta/jta-2.asp
-        public void NofifyPrepare(Transaction context)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void NotifyCommit(Transaction context)
-        {
-            throw new NotImplementedException();
-        }
-
-
-        public void NotifyAbort(Transaction context)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

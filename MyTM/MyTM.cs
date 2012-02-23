@@ -283,17 +283,5 @@ namespace MyTM
                 Thread.Sleep(100000);
             }
         }
-
-
-        //http://archive.devx.com/java/free/articles/dd_jta/jta-2.asp
-        public void OnRmPrepared(Transaction context, string rm)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void OnRmDone(Transaction context, string rm)
-        {
-            throw new NotImplementedException();
-        }
     }
 }
