@@ -11,7 +11,7 @@ namespace MyRM.Storage
         //TODO:  ADD LOCKS!!!
         public string TableName { get; set; }
         public string DataFileName { get; set; }
-        public int ShadowId { get; set; }
+        public int FileId { get; set; }
         public int PageIndex { get; set; }
         public int PageSize { get; set; }
         public int RowSize { get; set; }

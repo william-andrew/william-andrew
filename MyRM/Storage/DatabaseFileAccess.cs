@@ -90,11 +90,8 @@ namespace MyRM.Storage
 
         public void InsertRecord(Transaction tid, string tableName, string key, Row record)
         {
-            //shadow id of the index tableName
-            var shadowId = _tables[tableName];
-
             //read active page tableName
-            var pageTable = this.ReadPageTable(tableName, shadowId);
+            var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
             if ((from k in pageTable.PageIndices where k.Key == key select k).Any())
@@ -105,43 +102,44 @@ namespace MyRM.Storage
             //TODO: fix this algorithm
             foreach(var item in pageTable.PageIndices)
             {
-                if (item.ShadowId != shadowId)
-                    continue;
-
-                page = ReadPage(tableName, item.PageIndex, item.ShadowId);
-                if (page.NextFreeRowIndex <= page.RowsPerPage)
+                if (item.Key[0] != 0)
                 {
-                    break;
+                    page = DiskReadPage(tableName, item.PageIndex, item.ActiveId);
+                    if (page.NextFreeRowIndex <= page.RowsPerPage)
+                    {
+                        break;
+                    }
                 }
                 page = null;
             }
 
             if (page == null)
-                throw new ApplicationException("out of space");
+                page = DiskReadPage(tableName, 0, 0);
+            //fix this bug
+            //if (page == null)
+             //   throw new ApplicationException("out of space");
 
             var rowId = page.InsertRow(record);
-            page.ShadowId = page.ShadowId == 0 ? 1 : 0;
+            page.FileId = page.FileId == 0 ? 1 : 0;
 
             //update page table
-            pageTable.InsertIndex(key, page.PageIndex, rowId, page.ShadowId);
+            pageTable.InsertIndex(key, page.PageIndex, rowId, page.FileId);
 
             //write page into the shawdow
-            WritePage(tableName, page, page.ShadowId);
+            DiskWritePage(tableName, page, page.FileId);
 
             //save page tableName file
-            WritePageTable(tableName, pageTable, shadowId == 0 ? 1 : 0);
+            UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId);
+            DiskWritePageTable(tableName, pageTable);
 
             //TODO: NOT COMMIT HERE
-            CommitPage(tid, tableName, page, shadowId == 0 ? 1 : 0);
+            CommitPage(tid, tableName, page);
         }
 
         public void UpdateRecord(Transaction tid, string tableName, string key, Row record)
         {
-            //shadow id of the index tableName
-            var shadowId = _tables[tableName];
-
             //read active page tableName
-            var pageTable = this.ReadPageTable(tableName, shadowId);
+            var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
             var index = (from item in pageTable.PageIndices where item.Key == key select item).SingleOrDefault();
@@ -149,31 +147,42 @@ namespace MyRM.Storage
             if (index == null)
                 throw new ApplicationException("record not found");
 
-            var page = ReadPage(tableName, index.PageIndex, index.ShadowId);
+            var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId);
 
             page.UpdateRow(record, index.RowIndex);
-            page.ShadowId = page.ShadowId == 0 ? 1 : 0;
+            page.FileId = page.FileId == 0 ? 1 : 0;
 
             //write page into the shawdow
-            WritePage(tableName, page, page.ShadowId);
+            DiskWritePage(tableName, page, page.FileId);
 
-            //update page table index 
-            index.ShadowId = page.ShadowId;
+            //update page table index
+            index.ShadowId = page.FileId;
+            index.IsDirty = 1;
 
             //save page tableName file
-            WritePageTable(tableName, pageTable, shadowId == 0 ? 1 : 0);
+            UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId);
+            DiskWritePageTable(tableName, pageTable);
 
             //TODO: NOT COMMIT HERE
-            CommitPage(tid, tableName, page, shadowId == 0 ? 1 : 0);
+            CommitPage(tid, tableName, page);
+        }
+
+        private void UpdateShadowIdsForPage(PageTable pageTable, int pageIndex, int shadowId)
+        {
+            foreach(var item in pageTable.PageIndices)
+            {
+                if (item.PageIndex == pageIndex)
+                {
+                    item.IsDirty = 1;
+                    item.ShadowId = shadowId;
+                }
+            }
         }
 
         public void DeleteRecord(Transaction tid, string tableName, string key)
         {
-            //shadow id of the index tableName
-            var shadowId = _tables[tableName];
-
             //read active page tableName
-            var pageTable = this.ReadPageTable(tableName, shadowId);
+            var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
             var index = (from item in pageTable.PageIndices where item.Key == key select item).SingleOrDefault();
@@ -181,114 +190,111 @@ namespace MyRM.Storage
             if (index == null)
                 throw new ApplicationException("record not found");
 
-            var page = ReadPage(tableName, index.PageIndex, index.ShadowId);
+            var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId);
 
             page.UpdateRow(new Row(page.RowSize), index.RowIndex);
-            page.ShadowId = page.ShadowId == 0 ? 1 : 0;
+            page.FileId = page.FileId == 0 ? 1 : 0;
 
             //write page into the shawdow
-            WritePage(tableName, page, page.ShadowId);
+            DiskWritePage(tableName, page, page.FileId);
 
             //update page table index 
             pageTable.RemoveIndex(index);
 
             //save page tableName file
-            WritePageTable(tableName, pageTable, shadowId == 0 ? 1 : 0);
+            UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId);
+            DiskWritePageTable(tableName, pageTable);
 
             //TODO: NOT COMMIT HERE
-            CommitPage(tid, tableName, page, shadowId == 0 ? 1 : 0);
+            CommitPage(tid, tableName, page);
         }
 
         public Row ReadRecord(Transaction tid, string tableName, string key)
         {
-            //shadow id of the index tableName
-            var shadowId = _tables[tableName];
-
             //get active page table based on the shadow id
-            var pt = ReadPageTable(tableName, shadowId);
+            var pt = DiskReadPageTable(tableName);
 
             var index = (from item in pt.PageIndices where item.Key == key select item).SingleOrDefault();
             
             if (index == null)
                 throw new ApplicationException("record not found");
 
-            var page = ReadPage(tableName, index.PageIndex, index.ShadowId);
+            var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId);
             return page.Row(index.RowIndex);
-        }
-
-        public void Commit(Transaction tid)
-        {
-            // flush dirty pages 
-            // remove the dirty pages in memory
-            // forget transaction
         }
 
         /// <summary>
         /// Write page into the shadow and create an updated page tableName for it
         /// </summary>
-        public int WritePage(Transaction tid, string tableName, string key, Page page)
+        public void WritePage(Transaction tid, string tableName, string key, Page page)
         {
             if (page.TableName != tableName)
                 throw new ArgumentException("page deson't below to the tableName");
 
-            //shadow id of the index tableName
-            var shadowId = _tables[tableName];
-
             //read active page tableName
-            var pageTable = this.ReadPageTable(tableName, shadowId);
+            var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
             var pageTableIndex = (from k in pageTable.PageIndices where k.Key == key select k).Single();
-            pageTableIndex.ShadowId = pageTableIndex.ShadowId == 0 ? 1 : 0;
+            pageTableIndex.ShadowId = pageTableIndex.ActiveId == 0 ? 1 : 0;
 
             if (pageTableIndex.PageIndex != page.PageIndex)
                 throw new ApplicationException("index doesn't match the page");
 
             //save page into shadow
-            WritePage(tableName, page, pageTableIndex.ShadowId);
+            DiskWritePage(tableName, page, pageTableIndex.ShadowId);
 
             //save page tableName file
-            WritePageTable(tableName, pageTable, shadowId == 0 ? 1: 0);
-
-            return pageTableIndex.ShadowId;
+            DiskWritePageTable(tableName, pageTable);
         }
 
         public Page ReadPage(string tableName, string key)
         {
-            //shadow id of the index tableName
-            var shadowId = _tables[tableName];
-
             //read active page tableName
-            var pageTable = this.ReadPageTable(tableName, shadowId);
+            var pageTable = this.DiskReadPageTable(tableName);
             var pageTableIndex = (from k in pageTable.PageIndices where k.Key == key select k).SingleOrDefault();
 
             if (pageTableIndex == null)
                 throw new RecordNotFoundException(key);
 
-            return ReadPage(tableName, pageTableIndex.PageIndex, pageTableIndex.ShadowId);
+            return DiskReadPage(tableName, pageTableIndex.PageIndex, pageTableIndex.ActiveId);
         }
 
-        public void CommitPage(Transaction tid, string tableName, Page page, int shadowId)
+        public void CommitPage(Transaction tid, string tableName, Page page)
         {
-            if (!page.IsDirty)
-                return;
+            //Copy shadowIds into ActiveIds and save
+            //this.DiskWritePageTable(tableName );
 
-            _tables[tableName] = shadowId;
+            var pageTable = this.DiskReadPageTable(tableName);
+            var pageIndex = page.PageIndex;
 
-            WriteDatabaseManifest();
+            foreach (var item in pageTable.PageIndices)
+            {
+                if (item.PageIndex == pageIndex)
+                {
+                    if (item.IsDirty == 1)
+                    {
+                        item.ActiveId = item.ShadowId;
+                        item.ShadowId = 0;
+                        item.IsDirty = 0;
+                    }
+                }
+            }
+
+            DiskWritePageTable(tableName, pageTable);
         }
 
-        private Page ReadPage(string tableName, int pageIndex, int shadowId)
+        private Page DiskReadPage(string tableName, int pageIndex, int fileId)
         {
-            string filename = tableName + ".data." + shadowId;
-            DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, shadowId);
+            string filename = DatabaseName + "." + tableName + ".data." + fileId;
+            DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, fileId);
 
             if (pageIndex >= tableDataFileHeader.PageNum)
                 throw new ApplicationException("pageIndex");
 
             var p = new Page
             {
-                ShadowId = shadowId,
+                FileId = fileId,
                 PageIndex = pageIndex,
                 PageSize = tableDataFileHeader.PageSize,
                 TableName = tableName,
@@ -306,15 +312,15 @@ namespace MyRM.Storage
             return p;
         }
 
-        private void WritePage(string tableName, Page page, int shadowId)
+        private void DiskWritePage(string tableName, Page page, int fileId)
         {
-            string filename = page.TableName + ".data." + shadowId;
-            DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, page.ShadowId);
+            string filename = DatabaseName + "." + page.TableName + ".data." + fileId;
+            DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, page.FileId);
 
             if (page.PageIndex >= tableDataFileHeader.PageNum)
                 throw new ApplicationException("pageIndex");
 
-            page.ShadowId = shadowId;
+            page.FileId = fileId;
             using (var fileStream = new FileStream(filename, FileMode.Open))
             {
                 fileStream.Seek(DataFileHeaderSize + page.PageIndex * page.PageSize, SeekOrigin.Begin);
@@ -323,9 +329,10 @@ namespace MyRM.Storage
             }
         }
 
-        private PageTable ReadPageTable(string tableName, int shadowId)
+        private PageTable DiskReadPageTable(string tableName)
         {
-            string filename = tableName + ".index." + shadowId;
+            string filename = DatabaseName + "." + tableName + ".index";
+
             using (var fileStream = new FileStream(filename, FileMode.OpenOrCreate))
             {
                 var buffer = new byte[DefaultPageSize];
@@ -335,9 +342,9 @@ namespace MyRM.Storage
             }
         }
 
-        private void WritePageTable(string tableName, PageTable pt, int shadowId)
+        private void DiskWritePageTable(string tableName, PageTable pt)
         {
-            string filename = tableName + ".index." + shadowId;
+            string filename = DatabaseName + "." + tableName + ".index";
 
             using (var fileStream = new FileStream(filename, FileMode.OpenOrCreate))
             {
@@ -350,13 +357,13 @@ namespace MyRM.Storage
 
         private void CreatePageTable(string tableName, int keySize)
         {
-            string filename = tableName + ".index." + 0;
+            string filename = DatabaseName + "." + tableName + ".index";
 
             if (File.Exists(filename))
                 return;
 
             var pt = new PageTable(new byte[DefaultPageSize], DefaultPageSize, keySize);
-            WritePageTable(tableName, pt, 0);
+            DiskWritePageTable(tableName, pt);
         }
 
         private void BuildNewDatabase()
@@ -396,7 +403,7 @@ namespace MyRM.Storage
 
             XDocument xdoc = XDocument.Load(DatabaseManifestFileName);
             Dictionary<string, int> tables = xdoc.Descendants("Table").ToDictionary(e => e.Attribute("Name").Value,
-                                                                                       e => Int32.Parse(e.Attribute("ShadowId").Value));
+                                                                                       e => Int32.Parse(e.Attribute("FileId").Value));
             _tables = tables;
         }
 
@@ -408,7 +415,7 @@ namespace MyRM.Storage
 
             foreach (var t in _tables)
             {
-                var e = new XElement("Table", new XAttribute("Name", t.Key), new XAttribute("ShadowId", t.Value));
+                var e = new XElement("Table", new XAttribute("Name", t.Key), new XAttribute("FileId", t.Value));
                 root.Add(e);
             }
             xdoc.Save(DatabaseManifestFileName + ".tmp");
@@ -443,7 +450,7 @@ namespace MyRM.Storage
         {
             for (int j = 0; j <= 1; j++)
             {
-                string filename = tableName + ".data." + j;
+                string filename = DatabaseName + "." + tableName + ".data." + j;
 
                 if (File.Exists(filename))
                     continue;
@@ -499,9 +506,9 @@ namespace MyRM.Storage
             }
         }
 
-        private DataFileHeader ReadDataFileHeader(string tableName, int shadowId)
+        private DataFileHeader ReadDataFileHeader(string tableName, int fileId)
         {
-            string filename = tableName + ".data." + shadowId;
+            string filename = DatabaseName + "." + tableName + ".data." + fileId;
             using (var fileStream = new FileStream(filename, FileMode.Open))
             {
                 var buffer = new byte[DataFileHeaderSize];

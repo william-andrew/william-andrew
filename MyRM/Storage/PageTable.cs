@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 
 namespace MyRM.Storage
@@ -21,7 +20,7 @@ namespace MyRM.Storage
 
             PageTableSize = pageTableSize;
             this._keySize = keySize;
-            this.EntrySize = this._keySize + 12;
+            this.EntrySize = keySize + 5 * 4; //PageIndex, RowIndex, ActiveId, FileId, IsDirty
     
             var encoder = new UTF8Encoding();
             PageIndices = new PageIndexEntry[PageTableSize/EntrySize];
@@ -38,7 +37,9 @@ namespace MyRM.Storage
                                  Key = encoder.GetString(keyBuffer),
                                  PageIndex = BitConverter.ToInt32(data, p + keySize),
                                  RowIndex = BitConverter.ToInt32(data, p + keySize + 4),
-                                 ShadowId = BitConverter.ToInt32(data, p + keySize + 4 + 4)
+                                 ActiveId = BitConverter.ToInt32(data, p + keySize + 4 + 4),
+                                 ShadowId = BitConverter.ToInt32(data, p + keySize + 4 + 4 + 4),
+                                 IsDirty = BitConverter.ToInt32(data, p + keySize + 4 + 4 + 4 + 4)
                              };
 
                 PageIndices[i] = pi;
@@ -61,8 +62,14 @@ namespace MyRM.Storage
                 byteArray = BitConverter.GetBytes(PageIndices[i].RowIndex);
                 Array.Copy(byteArray, 0, buffer, p + _keySize + 4, 4);
 
-                byteArray = BitConverter.GetBytes(PageIndices[i].ShadowId);
+                byteArray = BitConverter.GetBytes(PageIndices[i].ActiveId);
                 Array.Copy(byteArray, 0, buffer, p + _keySize + 4 + 4, 4);
+
+                byteArray = BitConverter.GetBytes(PageIndices[i].ShadowId);
+                Array.Copy(byteArray, 0, buffer, p + _keySize + 4 + 4 + 4, 4);
+
+                byteArray = BitConverter.GetBytes(PageIndices[i].IsDirty);
+                Array.Copy(byteArray, 0, buffer, p + _keySize + 4 + 4 + 4 + 4, 4);
             }
 
             return buffer;
@@ -72,14 +79,16 @@ namespace MyRM.Storage
         public void InsertIndex(string key, int pageId, int rowId, int pageShowdowId)
         {
             bool isDone = false;
-            foreach(var item in this.PageIndices)
+            foreach(var item in PageIndices)
             {
                 if (item.Key[0] == 0)
                 {
                     item.Key = key;
                     item.PageIndex = pageId;
                     item.RowIndex = rowId;
+                    item.ActiveId = 0;
                     item.ShadowId = pageShowdowId;
+                    item.IsDirty = 1;
                     isDone = true;
                     break;
                 }
@@ -92,14 +101,16 @@ namespace MyRM.Storage
         internal void RemoveIndex(PageIndexEntry index)
         {
             //TODO: reclaim the slot
-            foreach (var item in this.PageIndices)
+            foreach (var item in PageIndices)
             {
                 if (item.Key == index.Key)
                 {
-                    item.Key = new string('\0', this._keySize);
+                    item.Key = new string('\0', _keySize);
                     item.PageIndex = 0;
                     item.RowIndex = 0;
+                    item.ActiveId = 0;
                     item.ShadowId = 0;
+                    item.IsDirty = 0;
                 }
             }
         }

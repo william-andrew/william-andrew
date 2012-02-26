@@ -6,5 +6,8 @@ namespace MyRM.Storage
         public int PageIndex;
         public int RowIndex;
         public int ShadowId;
+        //Page Index V2
+        public int ActiveId;
+        public int IsDirty;
     }
 }
