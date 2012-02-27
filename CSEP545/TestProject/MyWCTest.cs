@@ -2,12 +2,22 @@
 using TP;
 using Transaction = TP.Transaction;
 using System.Linq;
-
+using System.IO;
+using System;
 namespace TestProject
 {
     [TestClass()]
     public class MyWCTest
     {
+        [TestInitialize]
+        public void CleanPreviousData()
+        {
+            string[] files = Directory.GetFiles(Environment.CurrentDirectory, "MYRM*");
+            foreach (string file in files)
+            {
+                File.Delete(file);
+            }
+        }
         /// <summary>
         ///A test for AddSeats
         ///</summary>
@@ -73,6 +83,7 @@ namespace TestProject
             }
             tm.Commit(context);
 
+            context = tm.Start();
             Assert.IsTrue(wc.AddSeats(context, "FLX", 100, 550));
             Assert.IsTrue(wc.AddSeats(context, "SGX", 200, 250));
             tm.Commit(context);

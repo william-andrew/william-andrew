@@ -45,11 +45,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommitedTransaction.cs" />
     <Compile Include="MyTM.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ResourceManagerList.cs" />
+    <Compile Include="TwoPhraseCommit.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\MyRM\MyRM.csproj">
+      <Project>{D632D16C-AFD4-4817-81ED-EC73552D4E1D}</Project>
+      <Name>MyRM</Name>
+    </ProjectReference>
     <ProjectReference Include="..\TP\TP.csproj">
       <Project>{CE08CD45-05C9-49E9-966C-2E893060B316}</Project>
       <Name>TP</Name>

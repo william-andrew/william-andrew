@@ -138,13 +138,14 @@ namespace TestProject
             Assert.AreEqual(count, rm.Query(context, rid));
         }
 
-        private MyRM.MyRM_Accessor MockRM()
+        public static MyRM.MyRM_Accessor MockRM()
         {
             var tm = new MyTM.MyTM();
             var rm = new MyRM_Accessor
                                               {
                                                   TransactionStorage = new TransactionStorage(new MockDatabase()),
-                                                  TransactionManager = tm                                             
+                                                  TransactionManager = tm,
+                                                  name =  "test"
                                               };
             tm.Register(rm);
             return rm;

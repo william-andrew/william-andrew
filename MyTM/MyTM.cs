@@ -15,12 +15,14 @@ namespace MyTM
     /// </summary>
     public class MyTM : MarshalByRefObject, TP.TM
     {
+        public class TransactionState{}
         private readonly Dictionary<string, RM> _resourceManagers;
         private readonly Dictionary<Transaction, ResourceManagerList> _resourceManagersEnlistedInTransactions
             = new Dictionary<Transaction, ResourceManagerList>();
 
+
         private static readonly AutoResetEvent ShutdownEvent = new AutoResetEvent(false);
-        private const int TransactionTimeout = 120;
+        private const int TransactionTimeout = 12000;
         private readonly Thread _transactionScavengerThread;
 
         public MyTM()
@@ -109,13 +111,9 @@ namespace MyTM
             {
                 if (_resourceManagersEnlistedInTransactions.ContainsKey(context))
                 {
-                    var list = _resourceManagersEnlistedInTransactions[context].ResourceManagers;
-
-                    foreach (RM r in list)
-                    {
-                        r.Commit(context);
-                    }
-
+                    CommitedTransaction trans = TwoPhraseCommit.Commit(context, _resourceManagersEnlistedInTransactions[context]);
+                    trans.DoneEvent.WaitOne(TransactionTimeout * 1000);
+                    // TODO: remove the context from the list only in completed call back
                     _resourceManagersEnlistedInTransactions.Remove(context);
                 }
             }

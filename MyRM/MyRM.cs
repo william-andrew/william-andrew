@@ -215,7 +215,8 @@ namespace MyRM
         //we can take a look the standard XA/Open interface.
         public XaResponse Prepare(Transaction context)
         {
-            throw new NotImplementedException();
+            //TODO: implement actual prepare code
+            return XaResponse.XA_OK;
         }
 
         /// <summary>

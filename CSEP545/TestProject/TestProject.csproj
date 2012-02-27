@@ -42,6 +42,7 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Runtime.Remoting" />
+    <Reference Include="System.ServiceModel" />
     <Reference Include="System.Transactions" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
@@ -52,6 +53,7 @@
     </CodeAnalysisDependentAssemblyPaths>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommitedTransactionTest.cs" />
     <Compile Include="DatabaseFileAccessTest.cs" />
     <Compile Include="DatabaseTest.cs" />
     <Compile Include="MyLMTest.cs" />
@@ -59,6 +61,7 @@
     <Compile Include="MyWCTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TransactionStorageTest.cs" />
+    <Compile Include="TwoPhraseCommitTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <Shadow Include="Test References\MyRM.accessor" />
@@ -80,6 +83,9 @@
       <Project>{CE08CD45-05C9-49E9-966C-2E893060B316}</Project>
       <Name>TP</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Shadow Include="Test References\MyTM.accessor" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
