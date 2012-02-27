@@ -12,9 +12,10 @@ namespace MyRM.Storage
     public class DatabaseFileAccess
     {
         public const int DefaultPageSize = 4096;
+        public const int PageHeadSize = 10; // {P$}{Page Index}{NextFreeRowIndex}
+
         private const int DefaultPageNumber = 1024;
-        public const int DefaultPageHeaderSize = 64;
-        private const int DataFileHeaderSize = 512;
+        private const int DataFileHeaderSize = 256;
 
         private readonly string _databaseName;
         private bool _isInitialized;
@@ -88,36 +89,73 @@ namespace MyRM.Storage
             }
         }
 
+        public Table OpenTable(string tableName)
+        {
+            EnsureInitialized();
+
+            if (!ContainsTable(tableName))
+            {
+                throw new ArgumentException(tableName);
+            }
+
+            var pageTable = this.DiskReadPageTable(tableName);
+            var header = this.ReadDataFileHeader(tableName, 0);
+
+            var table = new Table(tableName, pageTable, header);
+            return table;
+        }
+
         public void InsertRecord(Transaction tid, string tableName, string key, Row record)
         {
+            var header = this.ReadDataFileHeader(tableName, 0);
+            //aquire insertion lock
+
             //read active page tableName
             var pageTable = this.DiskReadPageTable(tableName);
 
+            //check if index is full
+            if (!(from k in pageTable.RecordIndices where k.Key[0] == 0 select k).Any())
+                throw new ApplicationException("index is full");
+
             //modify page tableName
-            if ((from k in pageTable.PageIndices where k.Key == key select k).Any())
+            if ((from k in pageTable.RecordIndices where k.Key == key select k).Any())
                 throw new ApplicationException("duplicate key");
 
             //find an empty page
+            var pageIndexTemp = Math.Abs(key.GetHashCode()) % header.TotalPageNum;
+            var pageStart = pageIndexTemp;
             Page page = null;
-            //TODO: fix this algorithm
-            foreach(var item in pageTable.PageIndices)
+
+            do
             {
-                if (item.Key[0] != 0)
+                bool pageInUse = false;
+                foreach (var item in pageTable.RecordIndices)
                 {
-                    page = DiskReadPage(tableName, item.PageIndex, item.ActiveId);
-                    if (page.NextFreeRowIndex <= page.RowsPerPage)
+                    if (item.Key[0] != 0 && item.PageIndex == pageIndexTemp)
                     {
-                        break;
+                        pageInUse = true;
+                        page = DiskReadPage(tableName, item.PageIndex, item.ActiveId);
+                        if (page.NextFreeRowIndex <= page.RowsPerPage)
+                        {
+                            break;
+                        }
+                        page = null;
                     }
                 }
-                page = null;
-            }
+                if (pageInUse)
+                {
+                    if (page == null)
+                        pageIndexTemp = (++pageIndexTemp) %header.TotalPageNum;
+                }
+                else
+                {
+                    page = DiskReadPage(tableName, pageIndexTemp, 0);
+                    break;                    
+                }
+            } while (pageIndexTemp != pageStart);
 
             if (page == null)
-                page = DiskReadPage(tableName, 0, 0);
-            //fix this bug
-            //if (page == null)
-             //   throw new ApplicationException("out of space");
+                throw new ApplicationException("out of page space");
 
             var rowId = page.InsertRow(record);
             page.FileId = page.FileId == 0 ? 1 : 0;
@@ -142,7 +180,7 @@ namespace MyRM.Storage
             var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
-            var index = (from item in pageTable.PageIndices where item.Key == key select item).SingleOrDefault();
+            var index = (from item in pageTable.RecordIndices where item.Key == key select item).SingleOrDefault();
 
             if (index == null)
                 throw new ApplicationException("record not found");
@@ -169,7 +207,7 @@ namespace MyRM.Storage
 
         private void UpdateShadowIdsForPage(PageTable pageTable, int pageIndex, int shadowId)
         {
-            foreach(var item in pageTable.PageIndices)
+            foreach(var item in pageTable.RecordIndices)
             {
                 if (item.PageIndex == pageIndex)
                 {
@@ -185,14 +223,14 @@ namespace MyRM.Storage
             var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
-            var index = (from item in pageTable.PageIndices where item.Key == key select item).SingleOrDefault();
+            var index = (from item in pageTable.RecordIndices where item.Key == key select item).SingleOrDefault();
 
             if (index == null)
                 throw new ApplicationException("record not found");
 
             var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId);
 
-            page.UpdateRow(new Row(page.RowSize), index.RowIndex);
+            page.UpdateRow(page.CreateEmptyRow(), index.RowIndex);
             page.FileId = page.FileId == 0 ? 1 : 0;
 
             //write page into the shawdow
@@ -214,13 +252,13 @@ namespace MyRM.Storage
             //get active page table based on the shadow id
             var pt = DiskReadPageTable(tableName);
 
-            var index = (from item in pt.PageIndices where item.Key == key select item).SingleOrDefault();
+            var index = (from item in pt.RecordIndices where item.Key == key select item).SingleOrDefault();
             
             if (index == null)
                 throw new ApplicationException("record not found");
 
             var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId);
-            return page.Row(index.RowIndex);
+            return page.GetRow(index.RowIndex);
         }
 
         /// <summary>
@@ -235,7 +273,7 @@ namespace MyRM.Storage
             var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
-            var pageTableIndex = (from k in pageTable.PageIndices where k.Key == key select k).Single();
+            var pageTableIndex = (from k in pageTable.RecordIndices where k.Key == key select k).Single();
             pageTableIndex.ShadowId = pageTableIndex.ActiveId == 0 ? 1 : 0;
 
             if (pageTableIndex.PageIndex != page.PageIndex)
@@ -252,7 +290,7 @@ namespace MyRM.Storage
         {
             //read active page tableName
             var pageTable = this.DiskReadPageTable(tableName);
-            var pageTableIndex = (from k in pageTable.PageIndices where k.Key == key select k).SingleOrDefault();
+            var pageTableIndex = (from k in pageTable.RecordIndices where k.Key == key select k).SingleOrDefault();
 
             if (pageTableIndex == null)
                 throw new RecordNotFoundException(key);
@@ -268,7 +306,7 @@ namespace MyRM.Storage
             var pageTable = this.DiskReadPageTable(tableName);
             var pageIndex = page.PageIndex;
 
-            foreach (var item in pageTable.PageIndices)
+            foreach (var item in pageTable.RecordIndices)
             {
                 if (item.PageIndex == pageIndex)
                 {
@@ -289,10 +327,10 @@ namespace MyRM.Storage
             string filename = DatabaseName + "." + tableName + ".data." + fileId;
             DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, fileId);
 
-            if (pageIndex >= tableDataFileHeader.PageNum)
+            if (pageIndex >= tableDataFileHeader.TotalPageNum)
                 throw new ApplicationException("pageIndex");
 
-            var p = new Page
+            var p = new Page(tableDataFileHeader)
             {
                 FileId = fileId,
                 PageIndex = pageIndex,
@@ -317,7 +355,7 @@ namespace MyRM.Storage
             string filename = DatabaseName + "." + page.TableName + ".data." + fileId;
             DataFileHeader tableDataFileHeader = ReadDataFileHeader(tableName, page.FileId);
 
-            if (page.PageIndex >= tableDataFileHeader.PageNum)
+            if (page.PageIndex >= tableDataFileHeader.TotalPageNum)
                 throw new ApplicationException("pageIndex");
 
             page.FileId = fileId;
@@ -457,9 +495,10 @@ namespace MyRM.Storage
 
                 var databaseHeader = new DataFileHeader
                 {
-                    PageNum = pageNum,
+                    TotalPageNum = pageNum,
                     PageSize = pageSize,
-                    Version = 1
+                    RowSize = rowSize,
+                    RowsPerPage = (pageSize - Page.PageHeadSize) /rowSize                   
                 };
 
                 var databaseHeaderBuffer = new byte[DataFileHeaderSize];
@@ -474,27 +513,19 @@ namespace MyRM.Storage
                     fileStream.Flush();
                 }
 
-                int rowsPerPage = (pageSize - DefaultPageHeaderSize) / rowSize;
-
                 using (var fileStream = new FileStream(filename, FileMode.Open))
                 {
                     for (int i = 0; i < pageNum; i++)
                     {
                         fileStream.Seek(DataFileHeaderSize + i * pageSize, SeekOrigin.Begin);
 
-                        //Mark Page Header - {P}{.}{Page Index}{RowSize}{rowsPerPage}{NextFreeRowIndex} 
+                        //Mark Page Header - {P$}{Page Index}{NextFreeRowIndex} 
                         var encoder = new UTF8Encoding();
 
-                        byte[] byteArray = encoder.GetBytes("P.");
+                        byte[] byteArray = encoder.GetBytes("P$");
                         fileStream.Write(byteArray, 0, byteArray.Length);
 
                         byteArray = BitConverter.GetBytes(i);
-                        fileStream.Write(byteArray, 0, byteArray.Length);
-
-                        byteArray = BitConverter.GetBytes(rowSize);
-                        fileStream.Write(byteArray, 0, byteArray.Length);
-
-                        byteArray = BitConverter.GetBytes(rowsPerPage);
                         fileStream.Write(byteArray, 0, byteArray.Length);
 
                         byteArray = BitConverter.GetBytes(0);
@@ -515,7 +546,9 @@ namespace MyRM.Storage
                 fileStream.Seek(0, SeekOrigin.Begin);
                 fileStream.Read(buffer, 0, DataFileHeaderSize);
                 object obj = SerializationHelper.ByteArrayToObject(buffer);
-                return (DataFileHeader)obj;
+                var pfh = (DataFileHeader) obj;
+                pfh.RowsPerPage = (pfh.PageSize - Page.PageHeadSize)/ pfh.RowSize;                
+                return pfh;
             }
         }
     }

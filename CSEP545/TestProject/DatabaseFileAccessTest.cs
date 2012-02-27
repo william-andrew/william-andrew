@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MyRM.Storage;
@@ -10,6 +12,34 @@ namespace TestProject
     public class DatabaseFileAccessTest
     {
         readonly UTF8Encoding _encoder = new UTF8Encoding();
+
+        [TestMethod]
+        public void RowTest()
+        {
+            var row = new Row(100) {Data = _encoder.GetBytes("row data read/write")};
+            Assert.AreEqual("row data read/write", row.DataString);
+
+            row.Data = _encoder.GetBytes("abc");
+            Assert.AreEqual("abc", row.DataString);
+        }
+
+        [TestMethod]
+        public void IndexTest()
+        {
+            var target = new DatabaseFileAccess_Accessor("RRR");
+            target.CreateTableFile("Car", 64, 1024, 1024);
+            PageTable pt = target.DiskReadPageTable("Car");
+            pt.InsertIndex("aa", 1, 1, 1);
+            pt.InsertIndex("bb", 1, 1, 1);
+            var r = new RecordIndexEntry
+                                     {
+                                         Key = "aa"
+                                     };
+            pt.RemoveIndex(r);
+            Assert.IsFalse((from i in pt.RecordIndices where i.Key == "aa" select i).Any());
+            pt.InsertIndex("aa", 1, 1, 1);
+            Assert.IsTrue(pt.RecordIndices[0].Key == "aa");
+        }
 
         [TestMethod]
         public void PageReadWriteTest()
@@ -26,20 +56,20 @@ namespace TestProject
             var encoder = new UTF8Encoding();
             var byteArray = encoder.GetBytes("Page Data");
 
-            var row = new Row(p1.RowSize);
+            var row = p1.CreateEmptyRow();
             Array.Copy(byteArray, row.Data, byteArray.Length);
             p1.UpdateRow(row, 8);
 
             target.DiskWritePage("Car", p1, p1.FileId);
 
             p1 = target.DiskReadPage("Car", 0, 0);
-            Assert.AreEqual("Page Data", encoder.GetString(p1.Row(8).Data, 0, byteArray.Length));
+            Assert.AreEqual("Page Data", encoder.GetString(p1.GetRow(8).Data, 0, byteArray.Length));
 
             p2.UpdateRow(row, p2.RowsPerPage - 1);
             target.DiskWritePage("Car", p2, p2.FileId);
 
             var p3 = target.DiskReadPage("Car", 12, 1);
-            Assert.AreEqual("Page Data", encoder.GetString(p3.Row(p3.RowsPerPage - 1).Data, 0, byteArray.Length));
+            Assert.AreEqual("Page Data", encoder.GetString(p3.GetRow(p3.RowsPerPage - 1).Data, 0, byteArray.Length));
 
             target.DiskWritePage("Car", p3, p3.FileId);
             var p4 = target.DiskReadPage("Car", 12, 1);
@@ -65,18 +95,18 @@ namespace TestProject
 
             db.CreateTable("Inventory.Car", 100);
             PageTable pt = db.DiskReadPageTable("Inventory.Car");
-            pt.PageIndices[0].Key = key;
-            pt.PageIndices[0].PageIndex = pageIndex;
-            pt.PageIndices[0].RowIndex = rowIndex;
-            pt.PageIndices[0].ActiveId = fileId;
+            pt.RecordIndices[0].Key = key;
+            pt.RecordIndices[0].PageIndex = pageIndex;
+            pt.RecordIndices[0].RowIndex = rowIndex;
+            pt.RecordIndices[0].ActiveId = fileId;
 
             db.DiskWritePageTable("Inventory.Car", pt);
 
             pt = db.DiskReadPageTable("Inventory.Car");
-            Assert.AreEqual(pt.PageIndices[0].Key, key);
-            Assert.AreEqual(pt.PageIndices[0].PageIndex, pageIndex);
-            Assert.AreEqual(pt.PageIndices[0].RowIndex, rowIndex);
-            Assert.AreEqual(pt.PageIndices[0].ActiveId, fileId);
+            Assert.AreEqual(pt.RecordIndices[0].Key, key);
+            Assert.AreEqual(pt.RecordIndices[0].PageIndex, pageIndex);
+            Assert.AreEqual(pt.RecordIndices[0].RowIndex, rowIndex);
+            Assert.AreEqual(pt.RecordIndices[0].ActiveId, fileId);
         }
 
         [TestMethod]
@@ -94,6 +124,7 @@ namespace TestProject
         {
             var db = new DatabaseFileAccess_Accessor("EEE");
             db.Initialize();
+            const int rowSize = 100;
             var key1 = new string('1', 36);
             var key2 = new string('2', 36);
             var key3 = new string('3', 36);
@@ -101,8 +132,8 @@ namespace TestProject
 
             var encoder = new UTF8Encoding();
 
-            db.CreateTable("Inventory.Car", 100);
-            db.InsertRecord(null, "Inventory.Car", key1, new Row
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(null, "Inventory.Car", key1, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Seattle, 123")
             });
@@ -110,7 +141,7 @@ namespace TestProject
             var row = db.ReadRecord(null, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, 123", row.DataString);
 
-            db.InsertRecord(null, "Inventory.Car", key2, new Row
+            db.InsertRecord(null, "Inventory.Car", key2, new Row(rowSize)
             {
                 Data = encoder.GetBytes("New York, 456")
             });
@@ -121,7 +152,7 @@ namespace TestProject
             row = db.ReadRecord(null, "Inventory.Car", key2);
             Assert.AreEqual("New York, 456", row.DataString);
 
-            db.InsertRecord(null, "Inventory.Car", key3, new Row
+            db.InsertRecord(null, "Inventory.Car", key3, new Row(rowSize)
             {
                 Data = encoder.GetBytes("London, 789")
             });
@@ -135,7 +166,7 @@ namespace TestProject
             row = db.ReadRecord(null, "Inventory.Car", key3);
             Assert.AreEqual("London, 789", row.DataString);
 
-            db.InsertRecord(null, "Inventory.Car", key4, new Row
+            db.InsertRecord(null, "Inventory.Car", key4, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Phoenix, 012")
             });
@@ -153,7 +184,7 @@ namespace TestProject
             Assert.AreEqual("Phoenix, 012", row.DataString);
 
             // Update
-            db.UpdateRecord(null, "Inventory.Car", key1, new Row
+            db.UpdateRecord(null, "Inventory.Car", key1, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Seattle, key1")
             });
@@ -161,7 +192,7 @@ namespace TestProject
             row = db.ReadRecord(null, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, key1", row.DataString);
 
-            db.UpdateRecord(null, "Inventory.Car", key2, new Row
+            db.UpdateRecord(null, "Inventory.Car", key2, new Row(rowSize)
             {
                 Data = encoder.GetBytes("New York, key2")
             });
@@ -169,7 +200,7 @@ namespace TestProject
             row = db.ReadRecord(null, "Inventory.Car", key2);
             Assert.AreEqual("New York, key2", row.DataString);
 
-            db.UpdateRecord(null, "Inventory.Car", key3, new Row
+            db.UpdateRecord(null, "Inventory.Car", key3, new Row(rowSize)
             {
                 Data = encoder.GetBytes("London, key3")
             });
@@ -177,7 +208,7 @@ namespace TestProject
             row = db.ReadRecord(null, "Inventory.Car", key3);
             Assert.AreEqual("London, key3", row.DataString);
 
-            db.UpdateRecord(null, "Inventory.Car", key4, new Row
+            db.UpdateRecord(null, "Inventory.Car", key4, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Phoenix, key4")
             });
@@ -206,7 +237,7 @@ namespace TestProject
             row = db.ReadRecord(null, "Inventory.Car", key3);
             Assert.AreEqual("London, key3", row.DataString);
 
-            db.InsertRecord(null, "Inventory.Car", key4, new Row
+            db.InsertRecord(null, "Inventory.Car", key4, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Oregon, 345")
             });
@@ -222,6 +253,40 @@ namespace TestProject
 
             row = db.ReadRecord(null, "Inventory.Car", key4);
             Assert.AreEqual("Oregon, 345", row.DataString);
-        } 
+        }
+
+        [TestMethod]
+        public void PageAllocationTest()
+        {
+            var db = new DatabaseFileAccess_Accessor("MMM");
+            db.Initialize();
+            const int rowSize = 100;
+
+            var encoder = new UTF8Encoding();
+            db.CreateTable("Hotel", rowSize);
+
+            var table = db.OpenTable("Hotel");
+
+            var keys = new string[table.PageTable.RecordIndices.Length];
+            var values = new string[table.PageTable.RecordIndices.Length];
+
+            for (int index = 0; index < table.PageTable.RecordIndices.Length; index++)
+            {
+                keys[index] = Guid.NewGuid().ToString();
+                values[index] = Guid.NewGuid().ToString();
+            }
+
+            for (int index = 0; index < table.PageTable.RecordIndices.Length; index++)
+            {
+                db.InsertRecord(null, table.Name, keys[index],
+                                new Row(rowSize) {Data = encoder.GetBytes(values[index])});
+            }
+
+            for (int index = 0; index < table.PageTable.RecordIndices.Length; index++)
+            {
+                var row = db.ReadRecord(null, table.Name, keys[index]);
+                Assert.AreEqual(values[index], row.DataString);
+            }
+        }
     }
 }
