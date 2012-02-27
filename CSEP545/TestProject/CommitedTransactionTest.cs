@@ -2,6 +2,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using TP;
+using System.IO;
 
 namespace TestProject
 {
@@ -14,6 +15,13 @@ namespace TestProject
     [TestClass()]
     public class CommitedTransactionTest
     {
+        [TestCleanup]
+        public void Cleanup()
+        {
+            File.Delete(TwoPhraseCommit_Accessor.LogFileName);
+            TwoPhraseCommit_Accessor.isInitialized = false;
+        }
+
         /// <summary>
         ///A test for SetState
         ///</summary>

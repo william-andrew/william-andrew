@@ -3,6 +3,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using TP;
 using System.IO;
+using System.Collections.Generic;
+
 namespace TestProject
 {
     /// <summary>
@@ -12,7 +14,12 @@ namespace TestProject
     [TestClass()]
     public class TwoPhraseCommitTest
     {
-
+        [TestCleanup]
+        public void Cleanup()
+        {
+            File.Delete(TwoPhraseCommit_Accessor.LogFileName);
+            TwoPhraseCommit_Accessor.isInitialized = false;
+        }
         /// <summary>
         ///A test for Commit
         ///</summary>
@@ -34,7 +41,8 @@ namespace TestProject
                 log = sr.ReadToEnd();
             }
 
-            Assert.AreEqual(context.Id.ToString("d") + "\tDone\ttest,", log);
+            string expected = context.Id.ToString("d") + "\tDone\ttest,\r";
+            Assert.AreEqual(expected, log); 
         }
 
         /// <summary>
@@ -65,6 +73,23 @@ namespace TestProject
 
             string expected = "12345678-1234-1234-1234-123456789012\tRollbacked\ttest4,\r12345678-1234-1234-1234-123456789013\tDone\ttest1,\r" + context.Id.ToString("d") + "\tDone\ttest,\r";
             Assert.AreEqual(expected, log);
+        }
+
+        private void AssertToLogEqual(string log1, string log2)
+        {
+            HashSet<string> a = new HashSet<string>();
+            string[] lines = log1.Split(new char[] { '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string line in lines)
+            {
+                a.Add(line);
+            }
+
+            lines = log2.Split(new char[] { '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string line in lines)
+            {
+                Assert.IsTrue(a.Contains(line));
+            }
+
         }
     }
 }
