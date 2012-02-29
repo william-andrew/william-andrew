@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Xml.Linq;
+using System.Runtime.Serialization.Json;
+using System.Text;
+using MyRM.Storage;
 using TP;
 
 namespace MyRM
@@ -28,103 +31,99 @@ namespace MyRM
             var obj = binForm.Deserialize(memStream);
             return obj;
         }
-
-        public static Dictionary<Customer, HashSet<RID>> DeserializeReservations(string xml)
+       
+        public static Row ConvertResourceToRow(Resource resource)
         {
-            var result = new Dictionary<Customer, HashSet<RID>>();
-            if (xml == null)
-                return result;
-
-            var xdoc = XDocument.Load(new StringReader(xml));
-            var root = xdoc.Element("Reservations");
-            if (root == null)
-                return result;
-
-            foreach (var e in root.Elements())
-            {
-                var c = new Customer
-                {
-                    Id = new Guid(e.Attribute("Customer").Value)
-                };
-
-                var items = new HashSet<RID>();
-
-                foreach (var i in e.Elements())
-                {
-                    TP.RID.Type t;
-                    Enum.TryParse(i.Attribute("Type").Value, true, out t);
-
-                    var value = i.Attribute("Name").Value;
-                    var rid = new RID(t, value);
-                    items.Add(rid);
-                }
-                result.Add(c, items);
-            }
-            return result;
+            var encoder = new UTF8Encoding();
+            var rowString = resource.getType() + "," + resource.getID().getName() + "," + resource.getCount().ToString(CultureInfo.InvariantCulture) + "," +
+                            resource.getPrice();
+            //TODO: FIX THE SIZE
+            var row = new Row(96) {Data = encoder.GetBytes(rowString)};
+            return row;
         }
 
-        public static string SerializeReservations(Dictionary<Customer, HashSet<RID>> reservations)
+        public static Resource ConvertRowToResource(Row record)
         {
-            var xdoc = new XDocument();
-            var root = new XElement("Reservations");
-            xdoc.Add(root);
+            var data = record.DataString.Split(',');
 
-            foreach (var c in reservations)
-            {
-                var e = new XElement("Reservation", new XAttribute("Customer", c.Key.Id.ToString()));
-                root.Add(e);
-                foreach (var r in c.Value)
-                {
-                    e.Add(new XElement("RID", new XAttribute("Type", r.getType()), new XAttribute("Name", r.getName())));
-                }
-            }
-            return xdoc.ToString();
+            RID.Type t;
+            Enum.TryParse(data[0], true, out t);
+            var name = data[1];
+            var c = int.Parse(data[2]);
+            var p = int.Parse(data[3]);
+
+            return new Resource(new RID(t, name), c, p);
         }
 
-        public static string SerializeResource(Dictionary<RID, Resource> dictionary)
+        public static HashSet<RID> ConvertRowToReservation(string key, Row record)
         {
-            var xdoc = new XDocument();
-            var root = new XElement("Resources");
-            xdoc.Add(root);
+            var items = new HashSet<RID>();
 
-            foreach (var r in dictionary)
+            var data = record.DataString.Split('|');
+
+            if (string.IsNullOrEmpty(record.DataString))
+                return items;
+
+            foreach (var r in data)
             {
-                var e = new XElement("Resource", new XAttribute("Type", r.Key.getType()),
-                    new XAttribute("Name", r.Key.getName()),
-                    new XAttribute("Price", r.Value.getPrice()),
-                    new XAttribute("Count", r.Value.getCount())
-                    );
-                root.Add(e);
-            }
-            return xdoc.ToString();
-        }
-
-        public static Dictionary<RID, Resource> DeserializeResources(string xml)
-        {
-            var result = new Dictionary<RID, Resource>();
-            if (xml == null)
-                return result;
-
-            var xdoc = XDocument.Load(new StringReader(xml));
-            var root = xdoc.Element("Resources");
-
-            if (root == null)
-                return result;
-
-            foreach (var e in root.Elements())
-            {
+                var rr = r.Split(',');
                 TP.RID.Type t;
-                Enum.TryParse(e.Attribute("Type").Value, true, out t);
-                var name = e.Attribute("Name").Value;
-                var c = int.Parse(e.Attribute("Count").Value);
-                var p = int.Parse(e.Attribute("Price").Value);
 
-                var key = new RID(t, name);
-                var item = new Resource(key, c, p);
+                Enum.TryParse(rr[1], true, out t);
 
-                result.Add(key, item);
+                var value = rr[0];
+                var rid = new RID(t, value);
+                items.Add(rid);
             }
-            return result;
+            return items;
+        }
+
+        public static Row ConvertReservationToRow(string key, HashSet<RID> reserved)
+        {
+            var encoder = new UTF8Encoding();
+            var rowString = new StringBuilder();
+            foreach(var r in reserved)
+            {
+                rowString.AppendFormat("{0},{1}|", r.getName(), r.getType().ToString());
+            }
+            if (rowString.Length > 0)
+                --rowString.Length;
+            return new Row(96){Data = encoder.GetBytes(rowString.ToString())};
+        }
+
+        public static byte[] ToJson<T>(this T obj)
+        {
+            var stream = new MemoryStream();
+            try
+            {
+                //serialize data to a stream, then to a JSON string
+                var jsSerializer = new DataContractJsonSerializer(typeof(T));
+                jsSerializer.WriteObject(stream, obj);
+
+                return stream.ToArray();
+            }
+            finally
+            {
+                stream.Close();
+                stream.Dispose();
+            }
+        }
+
+        public static T FromJson<T>(byte[] obj)
+        {
+            var stream = new MemoryStream(obj);
+            try
+            {
+                var jsSerializer = new DataContractJsonSerializer(typeof(T));
+                var r = jsSerializer.ReadObject(stream);
+
+                return (T)r;
+            }
+            finally
+            {
+                stream.Close();
+                stream.Dispose();
+            }
         }
     }
 }

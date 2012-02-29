@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using MyRM.Storage;
 using TP;
-using System.Threading;
 
 namespace MyRM
 {
@@ -11,28 +12,12 @@ namespace MyRM
     /// </summary>
     public class TransactionStorage
     {
-        private bool _isInitialized;
-        private TransactionData _primary = new TransactionData();
-
-        /// <summary>
-        /// This can support multiple transactions at the same time 
-        /// TODO: Each shadow contains only the items that has been written to
-        /// minimize the memory consumption and cost of creating a new transaction.
-        /// </summary>
-        private readonly Dictionary<Transaction, TransactionData> _shadows = new Dictionary<Transaction, TransactionData>();
-
         // Generic data persistence 
-        private readonly IDatabase _database;
+        private readonly IDatabaseFileAccess _database;
 
-        public TransactionStorage(IDatabase database)
+        public TransactionStorage(IDatabaseFileAccess database)
         {
             _database = database;
-        }
-
-        private void Init()
-        {
-            LoadFromDisk();
-            _isInitialized = true;
         }
 
         /// <summary>
@@ -41,18 +26,7 @@ namespace MyRM
         /// <param name="context">Design for supporting multiple transactions</param>
         public void Commit(Transaction context)
         {
-            // TODO: make it commit only the changed pages
-            // TODO: Make sure pages written by other transactions get updated in this shadow before this shadow is commited. 
-            // Making dirty record is enough for this operation because lockmanager ensures no other transactions can write to the same resource
-            lock (_shadows)
-            {
-                if (_shadows.ContainsKey(context))
-                {
-                    Interlocked.Exchange(ref _primary, _shadows[context]);
-                    _shadows.Remove(context);
-                }
-            }
-            WriteBackToDisk();
+            _database.Commit(context);
         }
 
         /// <summary>
@@ -61,20 +35,13 @@ namespace MyRM
         /// <param name="context">Design for supporting multiple transactions</param>
         public void Abort(Transaction context)
         {
-
             try
             {
-                lock (_shadows)
-                {
-                    _shadows.Remove(context);
-                }
+                _database.Abort(context);
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 Console.WriteLine(e);
-                // catch all exceptions here because if the same transaction is aborted twice, 
-                // the second abort will throw exception. It is ok to catch it because the 
-                // abort is actually successful. 
             }
         }
 
@@ -87,19 +54,21 @@ namespace MyRM
         /// <returns></returns>
         public Resource Read(Transaction context, RID key)
         {
-            TransactionData storage = GetStorage(context);
-            if (!storage.Resources.ContainsKey(key))
+            try
+            {
+                var record = _database.ReadRecord(context, Constants.ResourcesTableName, key.ToString());
+                return SerializationHelper.ConvertRowToResource(record);
+            }
+            catch(RecordNotFoundException)
             {
                 return null;
             }
-
-            return storage.Resources[key];
         }
 
         public IEnumerable<Resource> GetResources(Transaction context)
         {
-            TransactionData storage = GetStorage(context);
-            return storage.Resources.Values;
+            var rows = _database.ReadAllRecords(context, Constants.ResourcesTableName);
+            return rows.Select(r => SerializationHelper.ConvertRowToResource(r.Value)).ToList();
         }
 
         /// <summary>
@@ -112,17 +81,8 @@ namespace MyRM
         /// <returns>success</returns>
         public void Write(Transaction context, RID key, Resource resource)
         {
-            TransactionData currentShadow = CreateShadowIfNotExists(context);
-
-            // add or set the new value to the resource in shadow
-            if (!currentShadow.Resources.ContainsKey(key))
-            {
-                currentShadow.Resources.Add(key, resource);
-            }
-            else
-            {
-                currentShadow.Resources[key] = resource;
-            }
+            var row = SerializationHelper.ConvertResourceToRow(resource);
+            _database.UpsertRecord(context, Constants.ResourcesTableName, key.ToString(), row);
         }
 
         /// <summary>
@@ -133,8 +93,17 @@ namespace MyRM
         /// <returns></returns>
         public bool Delete(Transaction context, RID key)
         {
-            TransactionData currentShadow = CreateShadowIfNotExists(context);
-            return currentShadow.Resources.Remove(key);
+            //TransactionData currentShadow = CreateShadowIfNotExists(context);
+            //return currentShadow.Resources.Remove(key);
+            try
+            {
+                _database.DeleteRecord(context, Constants.ResourcesTableName, key.ToString());
+                return true;
+            }
+            catch(RecordNotFoundException)
+            {
+                return false;
+            }
         }
         #endregion
 
@@ -147,13 +116,15 @@ namespace MyRM
         /// <returns></returns>
         public HashSet<RID> Read(Transaction context, Customer key)
         {
-            TransactionData storage = GetStorage(context);
-            if (!storage.Reservations.ContainsKey(key))
+            try
+            {
+                var record = _database.ReadRecord(context, Constants.ReservationTableName, key.Id.ToString());
+                return SerializationHelper.ConvertRowToReservation(key.Id.ToString(), record);
+            }
+            catch (RecordNotFoundException)
             {
                 return null;
             }
-
-            return storage.Reservations[key];
         }
 
         /// <summary>
@@ -163,8 +134,8 @@ namespace MyRM
         /// <returns></returns>
         public IEnumerable<Customer> GetCustomers(Transaction context)
         {
-            TransactionData storage = GetStorage(context);
-            return storage.Reservations.Keys;
+            var rows = _database.ReadAllRecords(context, Constants.ReservationTableName);
+            return rows.Select(r => new Customer(r.Key)).ToList();
         }
 
         /// <summary>
@@ -174,17 +145,8 @@ namespace MyRM
         /// <returns>success</returns>
         public void Write(Transaction context, Customer key, HashSet<RID> reserved)
         {
-            TransactionData currentShadow = CreateShadowIfNotExists(context);            
-
-            // add or set the new value to the resource in shadow
-            if (!currentShadow.Reservations.ContainsKey(key))
-            {
-                currentShadow.Reservations.Add(key, reserved);
-            }
-            else
-            {
-                currentShadow.Reservations[key] = reserved;
-            }
+            var row = SerializationHelper.ConvertReservationToRow(key.Id.ToString(), reserved);
+            _database.UpsertRecord(context, Constants.ReservationTableName, key.Id.ToString(), row);
         }
 
         /// <summary>
@@ -195,112 +157,17 @@ namespace MyRM
         /// <returns></returns>
         public bool Delete(Transaction context, Customer key)
         {
-            TransactionData currentShadow = CreateShadowIfNotExists(context);
-            return currentShadow.Reservations.Remove(key);
+            try
+            {
+                _database.DeleteRecord(context, Constants.ReservationTableName, key.Id.ToString());
+                return true;
+            }
+            catch (RecordNotFoundException)
+            {
+                return false;
+            }
         }
         #endregion
-
-        /// <summary>
-        /// Get the reservations for the method who write the data to stable storage
-        /// TODO: implement dirty bits property so we can write back only the changed pages
-        /// </summary>
-        /// <returns></returns>
-        public Dictionary<Customer, HashSet<RID>> GetReservations()
-        {
-            return _primary.Reservations;
-        }
-
-        /// <summary>
-        /// Set the reservations for another method who loads the data from stable storage
-        /// </summary>
-        private void WriteBackToDisk()
-        {
-            string xml = SerializationHelper.SerializeReservations(_primary.Reservations);
-            _database.WriteTable(Constants.ReservationTableName, xml);
-            xml = SerializationHelper.SerializeResource(_primary.Resources);
-            _database.WriteTable(Constants.ResourcesTableName, xml);
-        }
-
-        /// <summary>
-        /// Get resources for the method who write data to stable storage.
-        /// 
-        /// If the database does not exists on disk, it will create an empty one in memory. 
-        /// </summary>
-        /// <returns></returns>
-        private void LoadFromDisk()
-        {
-            var xml = _database.ReadTable(Constants.ResourcesTableName);
-            _primary.Resources = string.IsNullOrEmpty(xml) ? new Dictionary<RID, Resource>() : SerializationHelper.DeserializeResources(xml);
-
-            xml = _database.ReadTable(Constants.ReservationTableName);
-            _primary.Reservations = string.IsNullOrEmpty(xml) ? new Dictionary<Customer, HashSet<RID>>() : SerializationHelper.DeserializeReservations(xml);
-        }
-
-        /// <summary>
-        /// Gets the correct transaction storage for the transaction
-        /// </summary>
-        /// <param name="context">Design for supporting multiple transactions</param>
-        /// <returns>
-        /// The primary transaction storage if there is no shadow for the transaction.
-        /// The shadow transaction storage if there is a shadow for the transaction
-        /// </returns>
-        private TransactionData GetStorage(Transaction context)
-        {
-            TransactionData storage;
-
-            lock (_shadows)
-            {
-                if (!_isInitialized)
-                {
-                    Init();
-                }
-                if (!_shadows.TryGetValue(context, out storage))
-                {
-                    storage = _primary;
-                }
-            }
-            return storage;
-        }
-
-        /// <summary>
-        /// Gets the shadow copy for this transaction.
-        /// Creates a shadow copy of the primary for the transaction if no shadow copy for this transaction exists
-        /// </summary>
-        /// <param name="context">Design for supporting multiple transactions</param>
-        /// <returns>the shadow copy of the database</returns>
-        private TransactionData CreateShadowIfNotExists(Transaction context)
-        {
-            if (!_isInitialized)
-            {
-                Init();
-            }
-
-            TransactionData shadow;
-            if (!_shadows.TryGetValue(context, out shadow))
-            {                
-                // create new shadow if there is none for the context and copy the contents in primary to shadow
-                shadow = new TransactionData();
-                lock (_shadows)
-                {
-                    _shadows.Add(context, shadow);
-                    shadow.Reservations = new Dictionary<Customer, HashSet<RID>>(_primary.Reservations.Count);
-                    foreach (KeyValuePair<Customer, HashSet<RID>> item in _primary.Reservations)
-                    {
-                        var newSet = new HashSet<RID>(item.Value);
-                        shadow.Reservations.Add(item.Key, newSet);
-                    }
-
-                    shadow.Resources = new Dictionary<RID, Resource>(_primary.Resources.Count);
-                    foreach (KeyValuePair<RID, Resource> item in _primary.Resources)
-                    {
-                        var newRes = new Resource(item.Key, item.Value.getCount(), item.Value.getPrice());
-                        shadow.Resources.Add(item.Key, newRes);
-                    }
-                }
-            }
-
-            return shadow;
-        }
     }
 }
 

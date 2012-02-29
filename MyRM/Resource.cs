@@ -1,55 +1,47 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using TP;
 
 namespace MyRM
 {
-
-    /**
-    * keep track of inventory information.
-    */
-    [System.Serializable()]
+    [Serializable]
     public class Resource
     {
-        private RID rID;
-        private int count;
-        private int price;
+        private readonly RID _rId;
+        private int _count;
+        private int _price;
 
         public Resource() { }
-        public Resource(RID rID)
+        public Resource(RID rId)
         {
-            this.rID = rID;
+            this._rId = rId;
         }
-        public Resource(RID rID, int c, int p)
+        public Resource(RID rId, int c, int p)
         {
-            this.rID = rID;
-            this.count = c;
-            this.price = p;
+            this._rId = rId;
+            this._count = c;
+            this._price = p;
         }
 
-        public String getName() { return rID.getName(); }
-        public RID getID() { return rID; }
-        public RID.Type getType() { return rID.getType(); }
-        public int getCount() { return count; }
-        public int getPrice() { return price; }
+        public String getName() { return _rId.getName(); }
+        public RID getID() { return _rId; }
+        public RID.Type getType() { return _rId.getType(); }
+        public int getCount() { return _count; }
+        public int getPrice() { return _price; }
 
-        public void incrCount() { ++this.count; }
-        public void incrCount(int c) { this.count += c; }
+        public void incrCount() { ++this._count; }
+        public void incrCount(int c) { this._count += c; }
 
-        public void decrCount(int c) { this.count -= c; }
-        public void decrCount() { --this.count; }
+        public void decrCount(int c) { this._count -= c; }
+        public void decrCount() { --this._count; }
 
-        public void setCount(int count) { this.count = count; }
-        public void setPrice(int price) { this.price = price; }
+        public void setCount(int count) { this._count = count; }
+        public void setPrice(int price) { this._price = price; }
 
+        public override int GetHashCode() { return _rId.GetHashCode(); }
 
-        public int hashCode() { return rID.GetHashCode(); }
-
-        public String toString()
+        public override String ToString()
         {
-            return rID.getName() + "," + count + "," + price;
+            return _rId.getName() + "," + _count + "," + _price;
         }
     }
 }

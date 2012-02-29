@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MyRM.Storage;
-using TP;
 
 namespace TestProject
 {
@@ -26,7 +24,7 @@ namespace TestProject
         [TestMethod]
         public void IndexTest()
         {
-            var target = new DatabaseFileAccess_Accessor("RRR");
+            var target = new DatabaseFileAccess_Accessor("RRR", false);
             target.CreateTableFile("Car", 64, 1024, 1024);
             PageTable pt = target.DiskReadPageTable("Car");
             pt.InsertIndex("aa", 1, 1, 1);
@@ -44,7 +42,7 @@ namespace TestProject
         [TestMethod]
         public void PageReadWriteTest()
         {
-            var target = new DatabaseFileAccess_Accessor("AAA");
+            var target = new DatabaseFileAccess_Accessor("AAA", false);
             target.CreateTableFile("Car", 64, 1024, 1024);
 
             var a = target.ReadDataFileHeader("Car", 0);
@@ -85,7 +83,7 @@ namespace TestProject
         [TestMethod]
         public void ReadPageTable()
         {
-            var db = new DatabaseFileAccess_Accessor("CCC");
+            var db = new DatabaseFileAccess_Accessor("CCC", false);
             db.Initialize();
             var key = Guid.NewGuid().ToString();
 
@@ -113,7 +111,7 @@ namespace TestProject
         [ExpectedException(typeof(RecordNotFoundException))]
         public void ReadPageRecordNotFound()
         {
-            var db = new DatabaseFileAccess_Accessor("DDD");
+            var db = new DatabaseFileAccess_Accessor("DDD", true);
             db.Initialize();
             db.CreateTable("Inventory.Car", 100);
             db.ReadPage("Inventory.Car", "key");
@@ -122,7 +120,7 @@ namespace TestProject
         [TestMethod]
         public void InsertUpdateRecord()
         {
-            var db = new DatabaseFileAccess_Accessor("EEE");
+            var db = new DatabaseFileAccess_Accessor("EEE", false);
             db.Initialize();
             const int rowSize = 100;
             var key1 = new string('1', 36);
@@ -223,9 +221,8 @@ namespace TestProject
                 row = db.ReadRecord(null, "Inventory.Car", key4);
                 Assert.Fail();
             }
-            catch(ApplicationException e)
+            catch(RecordNotFoundException)
             {
-                Assert.AreEqual("record not found", e.Message);
             }
 
             row = db.ReadRecord(null, "Inventory.Car", key1);
@@ -258,7 +255,7 @@ namespace TestProject
         [TestMethod]
         public void PageAllocationTest()
         {
-            var db = new DatabaseFileAccess_Accessor("MMM");
+            var db = new DatabaseFileAccess_Accessor("MMM", false);
             db.Initialize();
             const int rowSize = 100;
 
@@ -273,7 +270,7 @@ namespace TestProject
             for (int index = 0; index < table.PageTable.RecordIndices.Length; index++)
             {
                 keys[index] = Guid.NewGuid().ToString();
-                values[index] = Guid.NewGuid().ToString();
+                values[index] = Guid.NewGuid().ToString() + "_" + index;
             }
 
             for (int index = 0; index < table.PageTable.RecordIndices.Length; index++)
@@ -287,6 +284,9 @@ namespace TestProject
                 var row = db.ReadRecord(null, table.Name, keys[index]);
                 Assert.AreEqual(values[index], row.DataString);
             }
+
+            var rows = db.ReadAllRecords(null, "Hotel");
+            Assert.AreEqual(table.PageTable.RecordIndices.Length, rows.Count);
         }
     }
 }

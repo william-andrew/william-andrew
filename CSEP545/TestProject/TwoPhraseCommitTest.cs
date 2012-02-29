@@ -36,13 +36,13 @@ namespace TestProject
                 Assert.Fail("Timeout in commit");
             }
             string log;
-            using (StreamReader sr = new StreamReader(TwoPhraseCommit_Accessor.LogFileName))
+            using (var sr = new StreamReader(TwoPhraseCommit_Accessor.LogFileName))
             {
                 log = sr.ReadToEnd();
             }
 
             string expected = context.Id.ToString("d") + "\tDone\ttest,\r";
-            Assert.AreEqual(expected, log); 
+            Assert.IsTrue(log.Contains(expected)); 
         }
 
         /// <summary>

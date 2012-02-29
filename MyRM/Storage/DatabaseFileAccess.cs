@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -9,7 +10,7 @@ using TP;
 
 namespace MyRM.Storage
 {
-    public class DatabaseFileAccess
+    public class DatabaseFileAccess : IDatabaseFileAccess
     {
         public const int DefaultPageSize = 4096;
         public const int PageHeadSize = 10; // {P$}{Page Index}{NextFreeRowIndex}
@@ -23,9 +24,18 @@ namespace MyRM.Storage
 
         private static readonly object DatabaseLock = new object();
 
-        public DatabaseFileAccess(string databaseName)
+        public bool RequiresExplictCommit { get; private set; }
+
+        private static readonly Dictionary<Transaction, List<Page>> TranactionList =
+            new Dictionary<Transaction, List<Page>>();
+
+        public DatabaseFileAccess(string databaseName, bool requiresExplictCommit, bool isIntializationRequired = true)
         {
             _databaseName = databaseName;
+            this.RequiresExplictCommit = false;
+
+            if (isIntializationRequired)
+                this.Initialize();
         }
 
         public string DatabaseName
@@ -105,6 +115,34 @@ namespace MyRM.Storage
             return table;
         }
 
+        public Dictionary<string, Row> ReadAllRecords(Transaction tid, string tableName)
+        {
+            //aquire read lock
+
+            //read active page tableName
+            var pageTable = this.DiskReadPageTable(tableName);
+            return (from r in pageTable.RecordIndices 
+                    where r.Key[0] != 0 
+                    select Trim(r.Key)).ToDictionary(key => key, key => ReadRecord(tid, tableName, key));
+        }
+
+        public void UpsertRecord(Transaction tid, string tableName, string key, Row record)
+        {
+            //aquire insertion lock
+
+            //read active page tableName
+            var pageTable = this.DiskReadPageTable(tableName);
+
+            if (!(from k in pageTable.RecordIndices where Trim(k.Key) == key select k).Any())
+            {
+                InsertRecord(tid, tableName, key, record);
+            }
+            else
+            {
+                UpdateRecord(tid, tableName, key, record);
+            }
+        }
+
         public void InsertRecord(Transaction tid, string tableName, string key, Row record)
         {
             var header = this.ReadDataFileHeader(tableName, 0);
@@ -118,7 +156,7 @@ namespace MyRM.Storage
                 throw new ApplicationException("index is full");
 
             //modify page tableName
-            if ((from k in pageTable.RecordIndices where k.Key == key select k).Any())
+            if ((from k in pageTable.RecordIndices where Trim(k.Key) == key select k).Any())
                 throw new ApplicationException("duplicate key");
 
             //find an empty page
@@ -145,12 +183,12 @@ namespace MyRM.Storage
                 if (pageInUse)
                 {
                     if (page == null)
-                        pageIndexTemp = (++pageIndexTemp) %header.TotalPageNum;
+                        pageIndexTemp = (++pageIndexTemp) % header.TotalPageNum;
                 }
                 else
                 {
                     page = DiskReadPage(tableName, pageIndexTemp, 0);
-                    break;                    
+                    break;
                 }
             } while (pageIndexTemp != pageStart);
 
@@ -170,8 +208,25 @@ namespace MyRM.Storage
             UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId);
             DiskWritePageTable(tableName, pageTable);
 
-            //TODO: NOT COMMIT HERE
-            CommitPage(tid, tableName, page);
+            if (RequiresExplictCommit)
+            {
+                lock (TranactionList)
+                {
+
+                    if (TranactionList.ContainsKey(tid))
+                    {
+                        TranactionList[tid].Add(page);
+                    }
+                    else
+                    {
+                        TranactionList.Add(tid, new List<Page> {page});
+                    }
+                }
+            }
+            else
+            {
+                CommitPage(tid, page);
+            }
         }
 
         public void UpdateRecord(Transaction tid, string tableName, string key, Row record)
@@ -180,10 +235,10 @@ namespace MyRM.Storage
             var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
-            var index = (from item in pageTable.RecordIndices where item.Key == key select item).SingleOrDefault();
+            var index = (from item in pageTable.RecordIndices where Trim(item.Key) == key select item).SingleOrDefault();
 
             if (index == null)
-                throw new ApplicationException("record not found");
+                throw new RecordNotFoundException("record not found");
 
             var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId);
 
@@ -201,8 +256,57 @@ namespace MyRM.Storage
             UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId);
             DiskWritePageTable(tableName, pageTable);
 
-            //TODO: NOT COMMIT HERE
-            CommitPage(tid, tableName, page);
+            if (RequiresExplictCommit)
+            {
+                lock (TranactionList)
+                {
+                    if (TranactionList.ContainsKey(tid))
+                    {
+                        TranactionList[tid].Add(page);
+                    }
+                    else
+                    {
+                        TranactionList.Add(tid, new List<Page> { page });
+                    }
+                }
+            }
+            else
+            {
+                CommitPage(tid, page);
+            }
+        }
+
+        public void Commit(Transaction tid)
+        {
+            List<Page> list;
+
+            try
+            {
+                lock (TranactionList)
+                {
+                    list = TranactionList[tid];
+                    TranactionList.Remove(tid);
+                }
+
+                foreach (var p in list)
+                {
+                    CommitPage(tid, p);
+                }
+            }catch(Exception e)
+            {
+                ;
+            }
+        }
+
+        public void Abort(Transaction tid)
+        {
+            lock (TranactionList)
+            {
+                if (!TranactionList.Remove(tid))
+                {
+                    throw new ApplicationException("transaction id not found");
+                }
+            }
         }
 
         private void UpdateShadowIdsForPage(PageTable pageTable, int pageIndex, int shadowId)
@@ -223,10 +327,10 @@ namespace MyRM.Storage
             var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
-            var index = (from item in pageTable.RecordIndices where item.Key == key select item).SingleOrDefault();
+            var index = (from item in pageTable.RecordIndices where Trim(item.Key) == key select item).SingleOrDefault();
 
             if (index == null)
-                throw new ApplicationException("record not found");
+                throw new RecordNotFoundException("record not found");
 
             var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId);
 
@@ -243,8 +347,25 @@ namespace MyRM.Storage
             UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId);
             DiskWritePageTable(tableName, pageTable);
 
-            //TODO: NOT COMMIT HERE
-            CommitPage(tid, tableName, page);
+            //FIX THE DUPLIATE PAGE
+            if (RequiresExplictCommit)
+            {
+                lock (TranactionList)
+                {
+                    if (TranactionList.ContainsKey(tid))
+                    {
+                        TranactionList[tid].Add(page);
+                    }
+                    else
+                    {
+                        TranactionList.Add(tid, new List<Page> { page });
+                    }
+                }
+            }
+            else
+            {
+                CommitPage(tid, page);
+            }
         }
 
         public Row ReadRecord(Transaction tid, string tableName, string key)
@@ -252,13 +373,18 @@ namespace MyRM.Storage
             //get active page table based on the shadow id
             var pt = DiskReadPageTable(tableName);
 
-            var index = (from item in pt.RecordIndices where item.Key == key select item).SingleOrDefault();
+            var index = (from item in pt.RecordIndices where Trim(item.Key) == key select item).SingleOrDefault();
             
             if (index == null)
-                throw new ApplicationException("record not found");
+                throw new RecordNotFoundException("record not found");
 
             var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId);
             return page.GetRow(index.RowIndex);
+        }
+
+        private string Trim(string key)
+        {
+            return key.TrimEnd('\0');
         }
 
         /// <summary>
@@ -273,7 +399,7 @@ namespace MyRM.Storage
             var pageTable = this.DiskReadPageTable(tableName);
 
             //modify page tableName
-            var pageTableIndex = (from k in pageTable.RecordIndices where k.Key == key select k).Single();
+            var pageTableIndex = (from k in pageTable.RecordIndices where Trim(k.Key) == key select k).Single();
             pageTableIndex.ShadowId = pageTableIndex.ActiveId == 0 ? 1 : 0;
 
             if (pageTableIndex.PageIndex != page.PageIndex)
@@ -290,7 +416,7 @@ namespace MyRM.Storage
         {
             //read active page tableName
             var pageTable = this.DiskReadPageTable(tableName);
-            var pageTableIndex = (from k in pageTable.RecordIndices where k.Key == key select k).SingleOrDefault();
+            var pageTableIndex = (from k in pageTable.RecordIndices where Trim(k.Key) == key select k).SingleOrDefault();
 
             if (pageTableIndex == null)
                 throw new RecordNotFoundException(key);
@@ -298,12 +424,12 @@ namespace MyRM.Storage
             return DiskReadPage(tableName, pageTableIndex.PageIndex, pageTableIndex.ActiveId);
         }
 
-        public void CommitPage(Transaction tid, string tableName, Page page)
+        public void CommitPage(Transaction tid, Page page)
         {
             //Copy shadowIds into ActiveIds and save
-            //this.DiskWritePageTable(tableName );
+            //this.DiskWritePageTable(tableName);
 
-            var pageTable = this.DiskReadPageTable(tableName);
+            var pageTable = this.DiskReadPageTable(page.TableName);
             var pageIndex = page.PageIndex;
 
             foreach (var item in pageTable.RecordIndices)
@@ -319,7 +445,7 @@ namespace MyRM.Storage
                 }
             }
 
-            DiskWritePageTable(tableName, pageTable);
+            DiskWritePageTable(page.TableName, pageTable);
         }
 
         private Page DiskReadPage(string tableName, int pageIndex, int fileId)
@@ -498,7 +624,7 @@ namespace MyRM.Storage
                     TotalPageNum = pageNum,
                     PageSize = pageSize,
                     RowSize = rowSize,
-                    RowsPerPage = (pageSize - Page.PageHeadSize) /rowSize                   
+                    RowsPerPage = (pageSize - Page.PageHeadSize) /rowSize
                 };
 
                 var databaseHeaderBuffer = new byte[DataFileHeaderSize];
@@ -547,7 +673,7 @@ namespace MyRM.Storage
                 fileStream.Read(buffer, 0, DataFileHeaderSize);
                 object obj = SerializationHelper.ByteArrayToObject(buffer);
                 var pfh = (DataFileHeader) obj;
-                pfh.RowsPerPage = (pfh.PageSize - Page.PageHeadSize)/ pfh.RowSize;                
+                pfh.RowsPerPage = (pfh.PageSize - Page.PageHeadSize)/ pfh.RowSize;
                 return pfh;
             }
         }

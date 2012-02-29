@@ -55,7 +55,7 @@
   <ItemGroup>
     <Compile Include="CommitedTransactionTest.cs" />
     <Compile Include="DatabaseFileAccessTest.cs" />
-    <Compile Include="DatabaseTest.cs" />
+    <Compile Include="MockDatabase.cs" />
     <Compile Include="MyLMTest.cs" />
     <Compile Include="MyRMTest.cs" />
     <Compile Include="MyWCTest.cs" />

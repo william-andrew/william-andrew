@@ -1,6 +1,7 @@
 ﻿using MyRM;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using MyRM.Storage;
 using TP;
 
 namespace TestProject
@@ -140,13 +141,16 @@ namespace TestProject
 
         public static MyRM.MyRM_Accessor MockRM()
         {
+            var db = new DatabaseFileAccess("file", true);
+            db.CreateTable(Constants.ReservationTableName, 36);
+            db.CreateTable(Constants.ResourcesTableName, 36);
             var tm = new MyTM.MyTM();
             var rm = new MyRM_Accessor
-                                              {
-                                                  TransactionStorage = new TransactionStorage(new MockDatabase()),
-                                                  TransactionManager = tm,
-                                                  name =  "test"
-                                              };
+                {
+                    _transactionStorage = new TransactionStorage(db),
+                    TransactionManager = tm,
+                    _name =  "test"
+                };
             tm.Register(rm);
             return rm;
         }

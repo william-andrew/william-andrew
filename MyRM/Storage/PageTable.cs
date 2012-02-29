@@ -54,7 +54,8 @@ namespace MyRM.Storage
             for (var i = 0; i < PageTableSize / EntrySize; i++)
             {
                 var p = i * EntrySize;
-                Array.Copy(encoder.GetBytes(RecordIndices[i].Key), 0, buffer, p, _keySize);
+                var byteKey = encoder.GetBytes(RecordIndices[i].Key);
+                Array.Copy(byteKey, 0, buffer, p, byteKey.Length < _keySize ? byteKey.Length : _keySize); //TODO: FIX KEY LEN VALIDATION
 
                 var byteArray = BitConverter.GetBytes(RecordIndices[i].PageIndex);
                 Array.Copy(byteArray, 0, buffer, p + _keySize, 4);

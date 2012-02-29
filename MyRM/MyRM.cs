@@ -3,21 +3,20 @@ using System.Collections.Generic;
 using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Channels.Http;
 using System.Text;
+using MyRM.Storage;
 using TP;
+
 namespace MyRM
 {
     /// <summary>
     /// class MyRM implements TP.RM
     /// </summary>
-    public class MyRM : System.MarshalByRefObject, TP.RM
+    public class MyRM : MarshalByRefObject, RM
     {
-        MyLM lockManager;
-        private TransactionStorage TransactionStorage;
-        private IDatabase database;
-
-        private string name;
-
-        static TP.TM transactionManager = null;
+        private readonly MyLM _lockManager;
+        private TransactionStorage _transactionStorage;
+        private string _name;
+        static TM _transactionManager;
  
         internal class GlobalState
         {
@@ -32,19 +31,11 @@ namespace MyRM
 
             public const string DefaultName = "MyRM";
             const int MaxNameLength = 21;
-            static string name = null;
+            static string name;
 
             public static string Name
             {
-                get
-                {
-                    if (name == null)
-                    {
-                        name = DefaultName;
-                    }
-
-                    return name;
-                }
+                get { return name ?? (name = DefaultName); }
                 set
                 {
                     if (name == null)
@@ -71,25 +62,25 @@ namespace MyRM
 
         public MyRM()
         {
-            this.lockManager = new MyLM();
-            name = "MyRM";
+            this._lockManager = new MyLM();
+            _name = "MyRM";
         }
 
-        public void SetName(string _name)
+        public void SetName(string name)
         {
-            name = _name;
+            this._name = name;
             InitStorage();
         }
 
         public string GetName()
         {
-            return name;
+            return _name;
         }
 
         // Property injection for testing only
-        public TP.TM TransactionManager
+        public TM TransactionManager
         {
-            set { transactionManager = value; }
+            set { _transactionManager = value; }
         }
 
         class RMParser : CommandLineParser
@@ -101,7 +92,6 @@ namespace MyRM
                 Add("tm", "TM", "The URL of the Transaction Manager.  Specify \"NONE\" to run this RM in stand alone mode", "http://localhost:8089/TM.soap");
             }
         }
-
 
         static void Main(string[] args)
         {
@@ -134,26 +124,26 @@ namespace MyRM
 
             if (String.Compare(parser["tm"], "none", true) != 0)
             {
-                while (transactionManager == null)
+                while (_transactionManager == null)
                 {
                     try
                     {
-                        transactionManager = (TP.TM)System.Activator.GetObject(typeof(TP.TM), parser["tm"]);
+                        _transactionManager = (TP.TM)System.Activator.GetObject(typeof(TP.TM), parser["tm"]);
 
-                        Transaction tid = transactionManager.Start();
+                        Transaction tid = _transactionManager.Start();
                         string[] urls = channel.GetUrlsForUri("RM.soap");
                         foreach (string url in urls)
                         {
-                            transactionManager.Register(url + "$" + GlobalState.Name);
+                            _transactionManager.Register(url + "$" + GlobalState.Name);
 
                         }
 
-                        transactionManager.Abort(tid);
+                        _transactionManager.Abort(tid);
 
                     }
                     catch (ArgumentException)
                     {
-                        transactionManager = null;
+                        _transactionManager = null;
                         Console.WriteLine("Waiting 1 second for Transaction Manager \"{0}\"", parser["tm"]);
                         System.Threading.Thread.Sleep(1000);
                     }
@@ -184,7 +174,7 @@ namespace MyRM
         /// <param name="context"></param>
         public void Enlist(TP.Transaction context)
         {
-             transactionManager.Enlist(context, this.GetName());
+             _transactionManager.Enlist(context, this.GetName());
         }
 
         /// <summary>
@@ -194,8 +184,8 @@ namespace MyRM
         public XaResponse Commit(TP.Transaction context)
         {
             // transactionManager.Commit(context);
-            TransactionStorage.Commit(context);
-            lockManager.UnlockAll(context);
+            _transactionStorage.Commit(context);
+            _lockManager.UnlockAll(context);
             return XaResponse.XA_OK;
         }
 
@@ -206,8 +196,8 @@ namespace MyRM
         public XaResponse Abort(TP.Transaction context)
         {
             // transactionManager.Abort(context);
-            TransactionStorage.Abort(context);
-            lockManager.UnlockAll(context);
+            _transactionStorage.Abort(context);
+            _lockManager.UnlockAll(context);
             return XaResponse.XA_OK;
         }
 
@@ -232,8 +222,8 @@ namespace MyRM
         {
             Enlist(context);
 
-            lockManager.LockForWrite(context, i);
-            Resource res = TransactionStorage.Read(context, i);
+            _lockManager.LockForWrite(context, i);
+            Resource res = _transactionStorage.Read(context, i);
             if (res == null)
             {
                 res = new Resource(i, count, price);
@@ -244,7 +234,7 @@ namespace MyRM
                 res.setPrice(price);
             }
 
-            TransactionStorage.Write(context, i, res);
+            _transactionStorage.Write(context, i, res);
             return true;
         }
 
@@ -259,18 +249,19 @@ namespace MyRM
         {
             Enlist(context);
 
-            lockManager.LockForWrite(context, rid);
-            bool removed = TransactionStorage.Delete(context, rid);
+            _lockManager.LockForWrite(context, rid);
+            bool removed = _transactionStorage.Delete(context, rid);
 
             // drop all reservations on removed resource
 
             if (removed)
             {
-                foreach (Customer c in TransactionStorage.GetCustomers(context))
+                foreach (Customer c in _transactionStorage.GetCustomers(context))
                 {
-                    lockManager.LockForWrite(context, c);
-                    HashSet<RID> e = TransactionStorage.Read(context, c);
+                    _lockManager.LockForWrite(context, c);
+                    HashSet<RID> e = _transactionStorage.Read(context, c);
                     e.Remove(rid);
+                    _transactionStorage.Write(context, c, e);
                 }
             }
 
@@ -288,8 +279,8 @@ namespace MyRM
         {
             Enlist(context);
 
-            lockManager.LockForWrite(context, rid);
-            Resource resource = TransactionStorage.Read(context, rid); ;
+            _lockManager.LockForWrite(context, rid);
+            Resource resource = _transactionStorage.Read(context, rid);
 
             if (resource == null)
             {
@@ -305,7 +296,7 @@ namespace MyRM
                 resource.setCount(0);
             }
 
-            TransactionStorage.Write(context, rid, resource);
+            _transactionStorage.Write(context, rid, resource);
             return true;
         }
 
@@ -348,9 +339,9 @@ namespace MyRM
         {
             Enlist(context);
 
-            lockManager.LockForRead(context, rid);
+            _lockManager.LockForRead(context, rid);
             Console.WriteLine("RM: Query");
-            Resource resource = TransactionStorage.Read(context, rid);
+            Resource resource = _transactionStorage.Read(context, rid);
 
             if (resource == null)
             {
@@ -370,8 +361,8 @@ namespace MyRM
         {
             Enlist(context);
 
-            lockManager.LockForRead(context, rid);
-            Resource resource = TransactionStorage.Read(context, rid);
+            _lockManager.LockForRead(context, rid);
+            Resource resource = _transactionStorage.Read(context, rid);
 
             if (resource == null)
             {
@@ -391,10 +382,10 @@ namespace MyRM
         {
             Enlist(context);
 
-            lockManager.LockForRead(context, customer);
+            _lockManager.LockForRead(context, customer);
             StringBuilder buf = new StringBuilder(512);
 
-            HashSet<RID> reserved = TransactionStorage.Read(context, customer);
+            HashSet<RID> reserved = _transactionStorage.Read(context, customer);
             if (reserved != null)
             {
                 foreach (RID rid in reserved)
@@ -421,13 +412,13 @@ namespace MyRM
 
             int bill = 0;
 
-            lockManager.LockForRead(context, customer);
-            HashSet<RID> reserved = TransactionStorage.Read(context, customer);
+            _lockManager.LockForRead(context, customer);
+            HashSet<RID> reserved = _transactionStorage.Read(context, customer);
             if (reserved != null)
             {
                 foreach (RID rid in reserved)
                 {
-                    Resource r = TransactionStorage.Read(context, rid);
+                    Resource r = _transactionStorage.Read(context, rid);
                     if (r == null)
                     {
                         throw new InvalidOperationException(rid + " does not exist in RM");
@@ -451,9 +442,9 @@ namespace MyRM
         {
             Enlist(context);
 
-            lockManager.LockForWrite(context, c);
-            lockManager.LockForWrite(context, i);
-            Resource resource = TransactionStorage.Read(context, i);
+            _lockManager.LockForWrite(context, c);
+            _lockManager.LockForWrite(context, i);
+            Resource resource = _transactionStorage.Read(context, i);
 
             if (resource == null)
             {
@@ -464,16 +455,12 @@ namespace MyRM
                 return false;
             }
 
-            HashSet<RID> r = TransactionStorage.Read(context, c);
-            if (r == null)
-            {
-                r = new HashSet<RID>();
-            }
+            HashSet<RID> r = _transactionStorage.Read(context, c) ?? new HashSet<RID>();
 
             r.Add(resource.getID());
-            TransactionStorage.Write(context, c, r);
+            _transactionStorage.Write(context, c, r);
             resource.decrCount();
-            TransactionStorage.Write(context, i, resource);
+            _transactionStorage.Write(context, i, resource);
             return true;
         }
 
@@ -487,8 +474,8 @@ namespace MyRM
         {
             Enlist(context);
 
-            lockManager.LockForWrite(context, c);
-            HashSet<RID> r = TransactionStorage.Read(context, c);
+            _lockManager.LockForWrite(context, c);
+            HashSet<RID> r = _transactionStorage.Read(context, c);
             if (r == null)
             {
                 // silently discard
@@ -497,8 +484,8 @@ namespace MyRM
             {
                 foreach (RID rid in r)
                 {
-                    lockManager.LockForWrite(context, rid);
-                    Resource resource = TransactionStorage.Read(context, rid);
+                    _lockManager.LockForWrite(context, rid);
+                    Resource resource = _transactionStorage.Read(context, rid);
                     if (resource == null)
                     {
                         // FIXME warn that the rID does not exist!
@@ -506,11 +493,11 @@ namespace MyRM
                     else
                     {
                         resource.incrCount();
-                        TransactionStorage.Write(context, rid, resource);
+                        _transactionStorage.Write(context, rid, resource);
                     }
                 }
 
-                TransactionStorage.Delete(context, c);
+                _transactionStorage.Delete(context, c);
             }
         }
 
@@ -525,11 +512,11 @@ namespace MyRM
             Enlist(context);
 
             List<string> result = new List<string>();
-            foreach (Resource resource in TransactionStorage.GetResources(context))
+            foreach (Resource resource in _transactionStorage.GetResources(context))
             {
                 if (type == resource.getType())
                 {
-                    result.Add(resource.toString());
+                    result.Add(resource.ToString());
                 }
             }
             return result.ToArray();
@@ -544,10 +531,9 @@ namespace MyRM
         {
             Enlist(context);
 
-            var customers = new List<Customer>(TransactionStorage.GetCustomers(context));
+            var customers = new List<Customer>(_transactionStorage.GetCustomers(context));
             return customers.ToArray();
         }
-
 
         /**
          * @todo setup {@link #selfDestruct(int)} here
@@ -559,22 +545,19 @@ namespace MyRM
 
         }
 
-
         protected void InitStorage()
         {
-            database = new Database("MYRM_" + name);
-            database.CreateTable(Constants.ReservationTableName);
-            database.CreateTable(Constants.ResourcesTableName);
-            TransactionStorage = new TransactionStorage(database);            
-            // TODO create database files, transaction logs
+            var database = new DatabaseFileAccess("MYRM_" + _name, true);
+            //TODO: BUGBUG: add validation to check the data and key length
+            database.CreateTable(Constants.ReservationTableName, 96, 36);
+            database.CreateTable(Constants.ResourcesTableName, 96, 36);
+            _transactionStorage = new TransactionStorage(database);            
         }
-
 
         protected void Recovery()
         {
             // TODO recover state from database file
         }
-
 
         protected void StartUp()
         {

@@ -5,9 +5,7 @@ using TP;
 using System.IO;
 
 namespace TestProject
-{
-    
-    
+{ 
     /// <summary>
     ///This is a test class for CommitedTransactionTest and is intended
     ///to contain all CommitedTransactionTest Unit Tests
@@ -44,6 +42,21 @@ namespace TestProject
         ///</summary>
         [TestMethod()]
         public void StartCommitTest()
+        {
+            Transaction context = new Transaction();
+            ResourceManagerList rms = new ResourceManagerList(MyRMTest.MockRM());
+            rms.Add(MyRMTest.MockRM());
+            CommitedTransaction_Accessor target = new CommitedTransaction_Accessor(context, rms);
+            CommitedTransaction_Accessor.stepTimeout = 1000;
+            target.StartCommit();
+            Assert.IsTrue(target.DoneEvent.WaitOne(1000));
+        }
+
+        /// <summary>
+        ///A test for StartCommit
+        ///</summary>
+        [TestMethod()]
+        public void StartCommitTestWithOneBadRM()
         {
             Transaction context = new Transaction();
             ResourceManagerList rms = new ResourceManagerList(MyRMTest.MockRM());

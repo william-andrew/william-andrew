@@ -1,6 +1,7 @@
 ﻿using MyRM;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using MyRM.Storage;
 using TP;
 using System.Collections.Generic;
 
@@ -126,8 +127,7 @@ namespace TestProject
             Transaction context = new Transaction();
             RID rid = new RID(RID.Type.FLIGHT, "test");
             Customer c = new Customer();
-            HashSet<RID> reservations = new HashSet<RID>();
-            reservations.Add(rid);
+            HashSet<RID> reservations = new HashSet<RID> {rid};
             var db = CreateDatabase();
             TransactionStorage tr = new TransactionStorage(db);
             tr.Write(context, c, reservations);
@@ -145,21 +145,19 @@ namespace TestProject
             Transaction context = new Transaction();
             RID rid = new RID(RID.Type.FLIGHT, "test");
             Customer c = new Customer();
-            HashSet<RID> reservations = new HashSet<RID>();
-            reservations.Add(rid);
+            HashSet<RID> reservations = new HashSet<RID> {rid};
             var db = CreateDatabase();
             TransactionStorage tr = new TransactionStorage(db);
             tr.Write(context, c, reservations);
-            HashSet<RID> actual;
-            actual = tr.Read(context, c);
-            Assert.AreEqual(reservations, actual);
+            HashSet<RID> actual = tr.Read(context, c);
+            Assert.IsTrue(reservations.SetEquals(actual));
         }
 
-        private IDatabase CreateDatabase()
+        private DatabaseFileAccess CreateDatabase()
         {
-            var db = new Database("TEST_" + Guid.NewGuid());
-            db.CreateTable(Constants.ReservationTableName);
-            db.CreateTable(Constants.ResourcesTableName);
+            var db = new DatabaseFileAccess("TEST_" + Guid.NewGuid(), false);
+            db.CreateTable(Constants.ReservationTableName, 96, 36);
+            db.CreateTable(Constants.ResourcesTableName, 96, 36);
             return db;
         }
     }
