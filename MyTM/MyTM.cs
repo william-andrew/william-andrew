@@ -111,7 +111,7 @@ namespace MyTM
             {
                 if (_resourceManagersEnlistedInTransactions.ContainsKey(context))
                 {
-                    CommitedTransaction trans = TwoPhraseCommit.Commit(context, _resourceManagersEnlistedInTransactions[context]);
+                    CommitedTransaction trans = TwoPhaseCommit.Commit(context, _resourceManagersEnlistedInTransactions[context]);
                     trans.DoneEvent.WaitOne(TransactionTimeout * 1000);
                     // TODO: remove the context from the list only in completed call back
                     _resourceManagersEnlistedInTransactions.Remove(context);

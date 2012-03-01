@@ -8,9 +8,12 @@ namespace MyTM
     [Serializable]
     public class CommitedTransaction
     {
+        private const int maxRetry = 3; 
+        private static int expBackoff = 500; // exponential back off starts from 500ms
         private static int stepTimeout = 50000; // millisecond
         private List<CommitState> rmCommitStates;
         private AutoResetEvent stepWaitEvent = new AutoResetEvent(false);
+        public string Message = string.Empty; // This is for demo 
         public CommitedTransaction(Transaction context, ResourceManagerList rms)
         {
             this.ResouceManagers = rms;
@@ -108,6 +111,8 @@ namespace MyTM
             }
         }
 
+        public delegate void CommitAction();
+
         /// <summary>
         /// The method to do two phrase commit
         /// This method shall be hosted in a new thread. 
@@ -115,21 +120,32 @@ namespace MyTM
         /// </summary>
         public void StartCommit()
         {
-            Prepare();
+            bool isStepComplete = WaitStepWithExpBackoff(Prepare);
 
-            if (this.stepWaitEvent.WaitOne(stepTimeout))
+            if (isStepComplete)
             {
-                TwoPhraseCommit.WriteLog();
-                Commit();
+                TwoPhaseCommit.WriteLog();
+                isStepComplete = WaitStepWithExpBackoff(Commit);
 
-                if (this.stepWaitEvent.WaitOne(stepTimeout))
+                if (isStepComplete)
                 {
-                    TwoPhraseCommit.WriteLog();
+                    TwoPhaseCommit.WriteLog();
                     DoneEvent.Set();
-                    TwoPhraseCommit.DoneCommit(this.Context);
+                    TwoPhaseCommit.DoneCommit(this.Context);
+                }
+                else
+                {
+                    Message += string.Format("2PC:Retry Commit {0}\r", this.Context.Id);
+                    WaitStepWithExpBackoff(Commit);
                 }
             }
+            else
+            {
+                // Presume abort
+                Rollback();
+            }
         }
+
 
         /// <summary>
         /// TM shall call this function when it restarts. 
@@ -146,11 +162,11 @@ namespace MyTM
             {
                 case CommitState.Committed:
                     Rollback();
-                    TwoPhraseCommit.WriteLog();
+                    TwoPhaseCommit.WriteLog();
                     break;
                 case CommitState.Prepared:
                     Commit();
-                    TwoPhraseCommit.WriteLog();
+                    TwoPhaseCommit.WriteLog();
                     break;
                 default:
                     this.stepWaitEvent.Set();
@@ -159,7 +175,7 @@ namespace MyTM
 
             return this.stepWaitEvent.WaitOne(stepTimeout);
         }
-
+        
         private void Prepare()
         {
             var list = this.ResouceManagers.ResourceManagers;
@@ -167,6 +183,7 @@ namespace MyTM
             {
                 RM r = list[i];
                 int temp = i;
+                Message += string.Format("2PC:Prepare {0}:{1}\r", this.Context.Id, r.GetName());
                 ThreadPool.QueueUserWorkItem(o =>
                 {
                     XaResponse response = r.Prepare(this.Context);
@@ -184,6 +201,7 @@ namespace MyTM
             for (int i = 0; i < list.Count; i++)
             {
                 RM r = list[i];
+                Message += string.Format("2PC:Commit {0}:{1}\r", this.Context.Id, r.GetName());
                 int temp = i;
                 ThreadPool.QueueUserWorkItem(o =>
                 {
@@ -202,6 +220,7 @@ namespace MyTM
             for (int i = 0; i < list.Count; i++)
             {
                 RM r = list[i];
+                Message += string.Format("2PC:Rollback {0}:{1}\r", this.Context.Id, r.GetName());
                 int temp = i;
                 ThreadPool.QueueUserWorkItem(o =>
                 {
@@ -212,6 +231,24 @@ namespace MyTM
                     }
                 });
             }
+        }
+
+        private bool WaitStepWithExpBackoff(CommitAction action)
+        {
+            int retry = 0;
+            int sleeptime = expBackoff;
+            bool isStepComplete = false;
+            action();
+            while (!(isStepComplete = this.stepWaitEvent.WaitOne(stepTimeout)) && retry < maxRetry)
+            {
+                Thread.Sleep(sleeptime);
+                sleeptime *= 2;
+                retry++;
+                Message += string.Format("Sleep and retry {0}\r", retry);
+                action();
+            }
+
+            return isStepComplete;
         }
     }
 

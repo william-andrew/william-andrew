@@ -16,8 +16,8 @@ namespace TestProject
         [TestCleanup]
         public void Cleanup()
         {
-            File.Delete(TwoPhraseCommit_Accessor.LogFileName);
-            TwoPhraseCommit_Accessor.isInitialized = false;
+            File.Delete(TwoPhaseCommit_Accessor.LogFileName);
+            TwoPhaseCommit_Accessor.isInitialized = false;
         }
 
         /// <summary>
@@ -56,15 +56,36 @@ namespace TestProject
         ///A test for StartCommit
         ///</summary>
         [TestMethod()]
-        public void StartCommitTestWithOneBadRM()
+        public void StartCommitWithOneFailCommitTest()
         {
             Transaction context = new Transaction();
-            ResourceManagerList rms = new ResourceManagerList(MyRMTest.MockRM());
+            MockRM failRm = new MockRM();
+            failRm.CommitResponse = TP.XaResponse.XAER_RMERR;
+            ResourceManagerList rms = new ResourceManagerList(failRm);
             rms.Add(MyRMTest.MockRM());
+            CommitedTransaction_Accessor.expBackoff = 1;
             CommitedTransaction_Accessor target = new CommitedTransaction_Accessor(context, rms);
-            CommitedTransaction_Accessor.stepTimeout = 1000;
+            CommitedTransaction_Accessor.stepTimeout = 10;
             target.StartCommit();
-            Assert.IsTrue(target.DoneEvent.WaitOne(1000));
+            Assert.AreEqual(string.Format("2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 1\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 2\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 3\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\r2PC:Retry Commit {0}\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 1\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 2\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 3\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\r", context.Id), target.Message);
+        }
+
+        /// <summary>
+        ///A test for StartCommit
+        ///</summary>
+        [TestMethod()]
+        public void StartCommitTestWithOneFailPrepare()
+        {
+            Transaction context = new Transaction();
+            MockRM failRm = new MockRM();
+            failRm.PrepareResponse = TP.XaResponse.XAER_RMERR;
+            ResourceManagerList rms = new ResourceManagerList(failRm);
+            rms.Add(MyRMTest.MockRM());
+            CommitedTransaction_Accessor.expBackoff = 1;
+            CommitedTransaction_Accessor target = new CommitedTransaction_Accessor(context, rms);
+            CommitedTransaction_Accessor.stepTimeout = 10;
+            target.StartCommit();
+            Assert.AreEqual(string.Format("2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\rSleep and retry 1\r2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\rSleep and retry 2\r2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\rSleep and retry 3\r2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\r2PC:Rollback {0}:MockRM\r2PC:Rollback {0}:test\r", context.Id), target.Message);
         }
 
         /// <summary>

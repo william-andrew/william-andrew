@@ -17,7 +17,7 @@ namespace MyTM
     // TODO: implemnt fault recovery
     // 1. load the commited transaciton log for disk and restore the states
     // 2. redo or undo the changes;
-    public static class TwoPhraseCommit
+    public static class TwoPhaseCommit
     {
         private const string LogFileName = "commitedTransaction.log";
         private static Dictionary<Transaction, CommitedTransaction> committedTransactions = new Dictionary<Transaction, CommitedTransaction>();

@@ -56,12 +56,13 @@
     <Compile Include="CommitedTransactionTest.cs" />
     <Compile Include="DatabaseFileAccessTest.cs" />
     <Compile Include="MockDatabase.cs" />
+    <Compile Include="MockRM.cs" />
     <Compile Include="MyLMTest.cs" />
     <Compile Include="MyRMTest.cs" />
     <Compile Include="MyWCTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TransactionStorageTest.cs" />
-    <Compile Include="TwoPhraseCommitTest.cs" />
+    <Compile Include="TwoPhaseCommitTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <Shadow Include="Test References\MyRM.accessor" />

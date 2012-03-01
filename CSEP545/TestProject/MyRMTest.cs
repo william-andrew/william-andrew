@@ -93,18 +93,6 @@ namespace TestProject
         }
 
         /// <summary>
-        ///A test for SelfDestruct
-        ///</summary>
-        //[TestMethod()]
-        public void SelfDestructTest()
-        {
-            MyRM.MyRM_Accessor rm = MockRM();
-            int diskWritesToWait = 0; // TODO: Initialize to an appropriate value
-            rm.SelfDestruct(diskWritesToWait);
-            Assert.Inconclusive("A method that does not return a value cannot be verified.");
-        }
-
-        /// <summary>
         ///A test for Shutdown
         ///</summary>
         //[TestMethod()]
