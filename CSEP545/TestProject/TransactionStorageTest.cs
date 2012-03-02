@@ -155,7 +155,7 @@ namespace TestProject
 
         private DatabaseFileAccess CreateDatabase()
         {
-            var db = new DatabaseFileAccess("TEST_" + Guid.NewGuid(), requiresExplictCommit: true);
+            var db = new DatabaseFileAccess("TEST_" + Guid.NewGuid(), useTwoPhaseCommit: true);
             db.CreateTable(Constants.ReservationTableName, 96, 36);
             db.CreateTable(Constants.ResourcesTableName, 96, 36);
             return db;

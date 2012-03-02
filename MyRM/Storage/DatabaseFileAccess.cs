@@ -23,15 +23,18 @@ namespace MyRM.Storage
 
         private static readonly object DatabaseLock = new object();
 
-        public bool RequiresExplictCommit { get; private set; }
+        public bool UseTwoPhaseCommit { get; private set; }
 
         private readonly Dictionary<Transaction, List<Page>> _tranactionList =
             new Dictionary<Transaction, List<Page>>();
 
-        public DatabaseFileAccess(string databaseName, bool requiresExplictCommit, bool isIntializationRequired = true)
+        private const int InsertedButNotCommitted = -1;
+        private const int DeletededButNotCommitted = -2;
+
+        public DatabaseFileAccess(string databaseName, bool useTwoPhaseCommit, bool isIntializationRequired = true)
         {
             _databaseName = databaseName;
-            this.RequiresExplictCommit = requiresExplictCommit;
+            this.UseTwoPhaseCommit = useTwoPhaseCommit;
 
             if (isIntializationRequired)
                 this.Initialize();
@@ -127,11 +130,11 @@ namespace MyRM.Storage
                 if (r.Key[0] != 0)
                 {
                     var key = Trim(r.Key);
-                    if (r.ActiveId == -1 && r.TransactionId != tid.Id)
+                    if (r.ActiveId == InsertedButNotCommitted && r.TransactionId != tid.Id)
                         continue;
 
                     //-2 means deleted, but not commited
-                    if (r.ActiveId == -2 && r.TransactionId == tid.Id)
+                    if (r.ActiveId == DeletededButNotCommitted && r.TransactionId == tid.Id)
                         continue;
 
                     list.Add(key, ReadRecord(tid, tableName, key));
@@ -169,12 +172,12 @@ namespace MyRM.Storage
 
             //If transaction id matches the record, allow read uncommitted data, otherwise
             //only allow reading committed records.
-            if (index.TransactionId != null && index.TransactionId == tid.Id && index.ActiveId == -2)
+            if (index.TransactionId != null && index.TransactionId == tid.Id && index.ActiveId == DeletededButNotCommitted)
             {
                 throw new RecordNotFoundException("record not found");
             }
 
-            if (index.TransactionId != null && index.TransactionId != tid.Id && index.ActiveId == -1)
+            if (index.TransactionId != null && index.TransactionId != tid.Id && index.ActiveId == InsertedButNotCommitted)
             {
                 throw new RecordNotFoundException("record not found");
             }
@@ -260,7 +263,7 @@ namespace MyRM.Storage
             UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId, tid.Id);
             DiskWritePageTable(tableName, pageTable);
 
-            if (RequiresExplictCommit)
+            if (UseTwoPhaseCommit)
             {
                 lock (_tranactionList)
                 {
@@ -276,7 +279,7 @@ namespace MyRM.Storage
             }
             else
             {
-                CommitPage(tid, page);
+                CommitPages(tid, new List<Page> { page });
             }
         }
 
@@ -291,7 +294,7 @@ namespace MyRM.Storage
             if (index == null)
                 throw new RecordNotFoundException("record not found");
 
-            if (index.TransactionId != null && index.TransactionId == tid.Id && index.ActiveId == -2)
+            if (index.TransactionId != null && index.TransactionId == tid.Id && index.ActiveId == DeletededButNotCommitted)
                 throw new RecordNotFoundException("record not found");
 
             var page = DiskReadPage(tableName, index.PageIndex, index.ActiveId < 0 ? index.ShadowId : index.ActiveId);
@@ -311,7 +314,7 @@ namespace MyRM.Storage
             UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId, tid.Id);
             DiskWritePageTable(tableName, pageTable);
 
-            if (RequiresExplictCommit)
+            if (UseTwoPhaseCommit)
             {
                 lock (_tranactionList)
                 {
@@ -327,7 +330,7 @@ namespace MyRM.Storage
             }
             else
             {
-                CommitPage(tid, page);
+                CommitPages(tid, new List<Page> { page });
             }
         }
 
@@ -361,7 +364,7 @@ namespace MyRM.Storage
             DiskWritePageTable(tableName, pageTable);
 
             //FIX THE DUPLIATE PAGE
-            if (RequiresExplictCommit)
+            if (UseTwoPhaseCommit)
             {
                 lock (_tranactionList)
                 {
@@ -377,7 +380,7 @@ namespace MyRM.Storage
             }
             else
             {
-                CommitPage(tid, page);
+                CommitPages(tid, new List<Page>{page});
             }
         }
 
@@ -395,12 +398,9 @@ namespace MyRM.Storage
                     list = _tranactionList[tid];
                     _tranactionList.Remove(tid);
                 }
-
-                foreach (var p in list)
-                {
-                    CommitPage(tid, p);
-                }
-            }catch(Exception e)
+                CommitPages(tid, list);
+            }
+            catch(Exception e)
             {
                 ;
             }
@@ -416,11 +416,7 @@ namespace MyRM.Storage
                     list = _tranactionList[tid];
                     _tranactionList.Remove(tid);
                 }
-
-                foreach (var p in list)
-                {
-                    AbortPage(tid, p);
-                }
+                AbortPage(tid, list);
             }
             catch (Exception e)
             {
@@ -483,67 +479,72 @@ namespace MyRM.Storage
             return DiskReadPage(tableName, pageTableIndex.PageIndex, pageTableIndex.ActiveId);
         }
 
-        public void CommitPage(Transaction tid, Page page)
+        public void CommitPages(Transaction tid, List<Page> pages)
         {
             //Copy shadowIds into ActiveIds and save
             //this.DiskWritePageTable(tableName);
 
-            var pageTable = this.DiskReadPageTable(page.TableName);
-
-            foreach (var item in pageTable.RecordIndices)
+            foreach (var page in pages)
             {
-                if (item.TransactionId == tid.Id)
+                var pageTable = this.DiskReadPageTable(page.TableName);
+
+                foreach (var item in pageTable.RecordIndices)
                 {
-                    if (item.IsDirty == 1)
+                    if (item.TransactionId == tid.Id)
                     {
-                        //Commit delete
-                        if (item.ActiveId == -2)
+                        if (item.IsDirty == 1)
+                        {
+                            //Commit delete
+                            if (item.ActiveId == DeletededButNotCommitted)
+                            {
+                                item.Key = new string('\0', item.Key.Length);
+                                item.ActiveId = 0;
+                            }
+
+                            item.ActiveId = item.ShadowId;
+                            item.ShadowId = 0;
+                            item.IsDirty = 0;
+                            item.TransactionId = Guid.Empty;
+                        }
+                    }
+                }
+
+                DiskWritePageTable(page.TableName, pageTable);
+            }
+        }
+
+        public void AbortPage(Transaction tid, List<Page> pages)
+        {
+            //Remove shadowIds associated with the records
+            foreach (var page in pages)
+            {
+                var pageTable = this.DiskReadPageTable(page.TableName);
+
+                foreach (var item in pageTable.RecordIndices)
+                {
+                    if (item.TransactionId == tid.Id)
+                    {
+                        //Remove the key inserted, but not commited
+                        if (item.ActiveId == InsertedButNotCommitted)
                         {
                             item.Key = new string('\0', item.Key.Length);
                             item.ActiveId = 0;
                         }
 
-                        item.ActiveId = item.ShadowId;
+                        //Undo delete
+                        if (item.ActiveId == DeletededButNotCommitted)
+                        {
+                            item.ActiveId = item.ShadowId;
+                        }
+
                         item.ShadowId = 0;
-                        item.IsDirty = 0;
                         item.TransactionId = Guid.Empty;
                     }
                 }
+
+                //this.DiskWritePageTable(tableName);
+                DiskWritePageTable(page.TableName, pageTable);
             }
-
-            DiskWritePageTable(page.TableName, pageTable);
-        }
-
-        public void AbortPage(Transaction tid, Page page)
-        {
-            //Remove shadowIds associated with the records
-            var pageTable = this.DiskReadPageTable(page.TableName);
-            var pageIndex = page.PageIndex;
-
-            foreach (var item in pageTable.RecordIndices)
-            {
-                if (item.TransactionId  == tid.Id)
-                {
-                    //Remove the key inserted, but not commited
-                    if (item.ActiveId == -1)
-                    {
-                        item.Key = new string('\0', item.Key.Length);
-                        item.ActiveId = 0;
-                    }
-
-                    //Undo delete
-                    if (item.ActiveId == -2)
-                    {
-                        item.ActiveId = item.ShadowId;
-                    }
-
-                    item.ShadowId = 0;
-                    item.TransactionId = Guid.Empty;
-                }
-            }
-
-            //this.DiskWritePageTable(tableName);
-            DiskWritePageTable(page.TableName, pageTable);
         }
 
         private Page DiskReadPage(string tableName, int pageIndex, int fileId)
