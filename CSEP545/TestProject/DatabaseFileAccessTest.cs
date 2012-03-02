@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MyRM.Storage;
+using TP;
 
 namespace TestProject
 {
@@ -25,17 +26,17 @@ namespace TestProject
         public void IndexTest()
         {
             var target = new DatabaseFileAccess_Accessor("RRR", false);
-            target.CreateTableFile("Car", 64, 1024, 1024);
+            target.CreateTableFile("Car", 64, 1024, 128);
             PageTable pt = target.DiskReadPageTable("Car");
-            pt.InsertIndex("aa", 1, 1, 1);
-            pt.InsertIndex("bb", 1, 1, 1);
+            pt.InsertIndex("aa", 1, 1, 1, Guid.Empty);
+            pt.InsertIndex("bb", 1, 1, 1, Guid.Empty);
             var r = new RecordIndexEntry
                                      {
                                          Key = "aa"
                                      };
-            pt.RemoveIndex(r);
+            pt.WipeoutIndex(r, Guid.Empty);
             Assert.IsFalse((from i in pt.RecordIndices where i.Key == "aa" select i).Any());
-            pt.InsertIndex("aa", 1, 1, 1);
+            pt.InsertIndex("aa", 1, 1, 1, Guid.Empty);
             Assert.IsTrue(pt.RecordIndices[0].Key == "aa");
         }
 
@@ -43,7 +44,7 @@ namespace TestProject
         public void PageReadWriteTest()
         {
             var target = new DatabaseFileAccess_Accessor("AAA", false);
-            target.CreateTableFile("Car", 64, 1024, 1024);
+            target.CreateTableFile("Car", 64, 1024, 128);
 
             var a = target.ReadDataFileHeader("Car", 0);
             var b = target.ReadDataFileHeader("Car", 1);
@@ -130,125 +131,127 @@ namespace TestProject
 
             var encoder = new UTF8Encoding();
 
+            var tid = new Transaction();
+
             db.CreateTable("Inventory.Car", rowSize);
-            db.InsertRecord(null, "Inventory.Car", key1, new Row(rowSize)
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Seattle, 123")
             });
 
-            var row = db.ReadRecord(null, "Inventory.Car", key1);
+            var row = db.ReadRecord(tid, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, 123", row.DataString);
 
-            db.InsertRecord(null, "Inventory.Car", key2, new Row(rowSize)
+            db.InsertRecord(tid, "Inventory.Car", key2, new Row(rowSize)
             {
                 Data = encoder.GetBytes("New York, 456")
             });
 
-            row = db.ReadRecord(null, "Inventory.Car", key1);
+            row = db.ReadRecord(tid, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, 123", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key2);
+            row = db.ReadRecord(tid, "Inventory.Car", key2);
             Assert.AreEqual("New York, 456", row.DataString);
 
-            db.InsertRecord(null, "Inventory.Car", key3, new Row(rowSize)
+            db.InsertRecord(tid, "Inventory.Car", key3, new Row(rowSize)
             {
                 Data = encoder.GetBytes("London, 789")
             });
 
-            row = db.ReadRecord(null, "Inventory.Car", key1);
+            row = db.ReadRecord(tid, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, 123", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key2);
+            row = db.ReadRecord(tid, "Inventory.Car", key2);
             Assert.AreEqual("New York, 456", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key3);
+            row = db.ReadRecord(tid, "Inventory.Car", key3);
             Assert.AreEqual("London, 789", row.DataString);
 
-            db.InsertRecord(null, "Inventory.Car", key4, new Row(rowSize)
+            db.InsertRecord(tid, "Inventory.Car", key4, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Phoenix, 012")
             });
 
-            row = db.ReadRecord(null, "Inventory.Car", key1);
+            row = db.ReadRecord(tid, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, 123", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key2);
+            row = db.ReadRecord(tid, "Inventory.Car", key2);
             Assert.AreEqual("New York, 456", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key3);
+            row = db.ReadRecord(tid, "Inventory.Car", key3);
             Assert.AreEqual("London, 789", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key4);
+            row = db.ReadRecord(tid, "Inventory.Car", key4);
             Assert.AreEqual("Phoenix, 012", row.DataString);
 
             // Update
-            db.UpdateRecord(null, "Inventory.Car", key1, new Row(rowSize)
+            db.UpdateRecord(tid, "Inventory.Car", key1, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Seattle, key1")
             });
 
-            row = db.ReadRecord(null, "Inventory.Car", key1);
+            row = db.ReadRecord(tid, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, key1", row.DataString);
 
-            db.UpdateRecord(null, "Inventory.Car", key2, new Row(rowSize)
+            db.UpdateRecord(tid, "Inventory.Car", key2, new Row(rowSize)
             {
                 Data = encoder.GetBytes("New York, key2")
             });
 
-            row = db.ReadRecord(null, "Inventory.Car", key2);
+            row = db.ReadRecord(tid, "Inventory.Car", key2);
             Assert.AreEqual("New York, key2", row.DataString);
 
-            db.UpdateRecord(null, "Inventory.Car", key3, new Row(rowSize)
+            db.UpdateRecord(tid, "Inventory.Car", key3, new Row(rowSize)
             {
                 Data = encoder.GetBytes("London, key3")
             });
 
-            row = db.ReadRecord(null, "Inventory.Car", key3);
+            row = db.ReadRecord(tid, "Inventory.Car", key3);
             Assert.AreEqual("London, key3", row.DataString);
 
-            db.UpdateRecord(null, "Inventory.Car", key4, new Row(rowSize)
+            db.UpdateRecord(tid, "Inventory.Car", key4, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Phoenix, key4")
             });
 
-            row = db.ReadRecord(null, "Inventory.Car", key4);
+            row = db.ReadRecord(tid, "Inventory.Car", key4);
             Assert.AreEqual("Phoenix, key4", row.DataString);
 
-            db.DeleteRecord(null, "Inventory.Car", key4);
+            db.DeleteRecord(tid, "Inventory.Car", key4);
 
             try
             {
-                row = db.ReadRecord(null, "Inventory.Car", key4);
+                row = db.ReadRecord(tid, "Inventory.Car", key4);
                 Assert.Fail();
             }
-            catch(RecordNotFoundException)
+            catch (RecordNotFoundException)
             {
             }
 
-            row = db.ReadRecord(null, "Inventory.Car", key1);
+            row = db.ReadRecord(tid, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, key1", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key2);
+            row = db.ReadRecord(tid, "Inventory.Car", key2);
             Assert.AreEqual("New York, key2", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key3);
+            row = db.ReadRecord(tid, "Inventory.Car", key3);
             Assert.AreEqual("London, key3", row.DataString);
 
-            db.InsertRecord(null, "Inventory.Car", key4, new Row(rowSize)
+            db.InsertRecord(tid, "Inventory.Car", key4, new Row(rowSize)
             {
                 Data = encoder.GetBytes("Oregon, 345")
             });
 
-            row = db.ReadRecord(null, "Inventory.Car", key1);
+            row = db.ReadRecord(tid, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, key1", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key2);
+            row = db.ReadRecord(tid, "Inventory.Car", key2);
             Assert.AreEqual("New York, key2", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key3);
+            row = db.ReadRecord(tid, "Inventory.Car", key3);
             Assert.AreEqual("London, key3", row.DataString);
 
-            row = db.ReadRecord(null, "Inventory.Car", key4);
+            row = db.ReadRecord(tid, "Inventory.Car", key4);
             Assert.AreEqual("Oregon, 345", row.DataString);
         }
 
@@ -258,6 +261,8 @@ namespace TestProject
             var db = new DatabaseFileAccess_Accessor("MMM", false);
             db.Initialize();
             const int rowSize = 100;
+
+            var tid = new Transaction();
 
             var encoder = new UTF8Encoding();
             db.CreateTable("Hotel", rowSize);
@@ -270,18 +275,18 @@ namespace TestProject
             for (int index = 0; index < table.PageTable.RecordIndices.Length; index++)
             {
                 keys[index] = Guid.NewGuid().ToString();
-                values[index] = Guid.NewGuid().ToString() + "_" + index;
+                values[index] = "VVVVVVVVVVVVVVVVVVVVV_" + index;
             }
 
             for (int index = 0; index < table.PageTable.RecordIndices.Length; index++)
             {
-                db.InsertRecord(null, table.Name, keys[index],
+                db.InsertRecord(tid, table.Name, keys[index],
                                 new Row(rowSize) {Data = encoder.GetBytes(values[index])});
             }
 
             for (int index = 0; index < table.PageTable.RecordIndices.Length; index++)
             {
-                var row = db.ReadRecord(null, table.Name, keys[index]);
+                var row = db.ReadRecord(tid, table.Name, keys[index]);
                 Assert.AreEqual(values[index], row.DataString);
             }
 

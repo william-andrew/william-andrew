@@ -254,6 +254,50 @@ namespace TestProject
         ///A test for Add/remove multiple resources in a transaction 
         ///</summary>
         [TestMethod]
+        public void AddDeleteCombinationsOneByOne()
+        {
+            var wc = new MyWC.MyWC();
+            var tm = new MyTM.MyTM();
+            var rmf = new MyRM.MyRM();
+            var rmc = new MyRM.MyRM();
+            var rmr = new MyRM.MyRM();
+
+            rmf.SetName("flight");
+            rmf.TransactionManager = tm;
+
+            rmc.SetName("car");
+            rmc.TransactionManager = tm;
+
+            rmr.SetName("room");
+            rmr.TransactionManager = tm;
+
+            tm.Register(rmf);
+            tm.Register(rmc);
+            tm.Register(rmr);
+
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+            MyWC.MyWC.Cars = tm.GetResourceMananger("car");
+            MyWC.MyWC.Rooms = tm.GetResourceMananger("room");
+
+            var context = new Transaction();
+            wc.AddSeats(context, "SEA-JFK", 3000, 300);
+            tm.Commit(context);
+            wc.AddCars(context, "NY", 2000, 200);
+            tm.Commit(context);
+            wc.AddRooms(context, "NY", 1000, 100);
+            tm.Commit(context);
+
+            context = new Transaction();
+            Assert.AreEqual(200, wc.QueryCarPrice(context, "NY"));
+            Assert.AreEqual(300, wc.QueryFlightPrice(context, "SEA-JFK"));
+            Assert.AreEqual(100, wc.QueryRoomPrice(context, "NY"));
+            tm.Commit(context);
+        }
+
+        /// <summary>
+        ///A test for Add/remove multiple resources in a transaction 
+        ///</summary>
+        [TestMethod]
         public void AddDeleteCombinations()
         {
             var wc = new MyWC.MyWC();
@@ -264,8 +308,10 @@ namespace TestProject
 
             rmf.SetName("flight");
             rmf.TransactionManager = tm;
+
             rmc.SetName("car");
-            rmf.TransactionManager = tm;
+            rmc.TransactionManager = tm;
+            
             rmr.SetName("room");
             rmr.TransactionManager = tm;
 
@@ -287,7 +333,7 @@ namespace TestProject
             Assert.AreEqual(200, wc.QueryCarPrice(context, "NY"));
             Assert.AreEqual(300, wc.QueryFlightPrice(context, "SEA-JFK"));
             Assert.AreEqual(100, wc.QueryRoomPrice(context, "NY"));
-            tm.Commit(context);            
+            tm.Commit(context);
         }
 
         /// <summary>
@@ -304,8 +350,10 @@ namespace TestProject
 
             rmf.SetName("flight");
             rmf.TransactionManager = tm;
+            
             rmc.SetName("car");
             rmc.TransactionManager = tm;
+
             rmr.SetName("room");
             rmr.TransactionManager = tm;
 
@@ -325,8 +373,8 @@ namespace TestProject
             wc.AddRooms(context, "NY", 1000, 100);
             tm.Commit(context);
 
-            var c1 = new Customer();            
-            var c2 = new Customer();            
+            var c1 = new Customer();
+            var c2 = new Customer();
             Assert.IsTrue(wc.ReserveItinerary(c1, new[] {"SEA-JFK", "JFK-STV"}, "NY", true, true));
             Assert.IsTrue(wc.ReserveItinerary(c2, new[] {"SEA-JFK"}, "NY", true, true));
 

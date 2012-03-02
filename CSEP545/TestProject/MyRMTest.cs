@@ -26,7 +26,7 @@ namespace TestProject
         [TestMethod()]
         public void AddTest()
         {
-            MyRM.MyRM_Accessor rm = MockRM();           
+            MyRM.MyRM_Accessor rm = MockRM();
             Transaction context = new Transaction(); 
             RID i = new RID(RID.Type.ROOM, "test1");
             int count = 1; 

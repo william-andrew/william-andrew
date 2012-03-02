@@ -37,7 +37,7 @@ namespace MyTM
         // Scan transactions and abort them if times out
         public void TransactionScavenger()
         {
-            while (ShutdownEvent.WaitOne(30000, false) == false)
+            while (ShutdownEvent.WaitOne(300000, false) == false)
             {
                 try
                 {

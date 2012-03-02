@@ -8,7 +8,7 @@ namespace MyRM.Storage
         public RecordIndexEntry[] RecordIndices;
 
         public int PageTableSize = DatabaseFileAccess.DefaultPageSize;
-        public int EntrySize;
+        public int RecordIndexEntrySizeInBytes;
         private readonly int _keySize;
 
         public PageTable(byte[] data, int pageTableSize = DatabaseFileAccess.DefaultPageSize, int keySize = 36)
@@ -20,14 +20,14 @@ namespace MyRM.Storage
 
             PageTableSize = pageTableSize;
             this._keySize = keySize;
-            this.EntrySize = keySize + 5 * 4; //PageIndex, RowIndex, ActiveId, ShadowId, IsDirty
+            this.RecordIndexEntrySizeInBytes = keySize + 5 * 4 + 32; //PageIndex, RowIndex, ActiveId, ShadowId, IsDirty, TransactionKey
     
             var encoder = new UTF8Encoding();
-            RecordIndices = new RecordIndexEntry[PageTableSize/EntrySize];
+            RecordIndices = new RecordIndexEntry[PageTableSize/RecordIndexEntrySizeInBytes];
 
-            for (var i = 0; i < PageTableSize / EntrySize; i++)
+            for (var i = 0; i < PageTableSize / RecordIndexEntrySizeInBytes; i++)
             {
-                var p = i * EntrySize;
+                var p = i * RecordIndexEntrySizeInBytes;
 
                 var keyBuffer = new byte[keySize];
                 Array.Copy(data, p, keyBuffer, 0, keySize);
@@ -39,8 +39,13 @@ namespace MyRM.Storage
                                  RowIndex = BitConverter.ToInt32(data, p + keySize + 4),
                                  ActiveId = BitConverter.ToInt32(data, p + keySize + 4 + 4),
                                  ShadowId = BitConverter.ToInt32(data, p + keySize + 4 + 4 + 4),
-                                 IsDirty = BitConverter.ToInt32(data, p + keySize + 4 + 4 + 4 + 4)
+                                 IsDirty = BitConverter.ToInt32(data, p + keySize + 4 + 4 + 4 + 4),
                              };
+                Guid tempTid;
+                if (Guid.TryParse(encoder.GetString(data, p + keySize + 4 + 4 + 4 + 4 + 4, 32), out tempTid) && tempTid != Guid.Empty)
+                {
+                    pi.TransactionId = tempTid;
+                }
 
                 RecordIndices[i] = pi;
             }
@@ -51,9 +56,9 @@ namespace MyRM.Storage
             var buffer = new byte[PageTableSize];
             var encoder = new UTF8Encoding();
 
-            for (var i = 0; i < PageTableSize / EntrySize; i++)
+            for (var i = 0; i < PageTableSize / RecordIndexEntrySizeInBytes; i++)
             {
-                var p = i * EntrySize;
+                var p = i * RecordIndexEntrySizeInBytes;
                 var byteKey = encoder.GetBytes(RecordIndices[i].Key);
                 Array.Copy(byteKey, 0, buffer, p, byteKey.Length < _keySize ? byteKey.Length : _keySize); //TODO: FIX KEY LEN VALIDATION
 
@@ -71,12 +76,18 @@ namespace MyRM.Storage
 
                 byteArray = BitConverter.GetBytes(RecordIndices[i].IsDirty);
                 Array.Copy(byteArray, 0, buffer, p + _keySize + 4 + 4 + 4 + 4, 4);
+
+                if (RecordIndices[i].TransactionId != null)
+                {
+                    byteArray = encoder.GetBytes(RecordIndices[i].TransactionId.Value.ToString("N"));
+                    Array.Copy(byteArray, 0, buffer, p + _keySize + 4 + 4 + 4 + 4 + 4, 32);
+                }
             }
 
             return buffer;
         }
 
-        public void InsertIndex(string key, int pageId, int rowId, int pageFileId)
+        public void InsertIndex(string key, int pageId, int rowId, int pageFileId, Guid transactionId)
         {
             lock (this.RecordIndices)
             {
@@ -88,9 +99,11 @@ namespace MyRM.Storage
                         item.Key = key;
                         item.PageIndex = pageId;
                         item.RowIndex = rowId;
-                        item.ActiveId = 0;
+                        item.ActiveId = -1; // not committed yet
                         item.ShadowId = pageFileId;
                         item.IsDirty = 1;
+
+                        item.TransactionId = transactionId;
                         isDone = true;
                         break;
                     }
@@ -101,7 +114,24 @@ namespace MyRM.Storage
             }
         }
 
-        public void RemoveIndex(RecordIndexEntry index)
+        public void MarkIndexDeleted(RecordIndexEntry index, Guid transactionId)
+        {
+            lock (this.RecordIndices)
+            {
+                foreach (var item in RecordIndices)
+                {
+                    if (item.Key == index.Key)
+                    {
+                        item.ShadowId = item.ActiveId;
+                        item.ActiveId = -2;
+                        item.IsDirty = 1;
+                        item.TransactionId = transactionId;
+                    }
+                }
+            }
+        }
+
+        public void WipeoutIndex(RecordIndexEntry index, Guid transactionId)
         {
             lock (this.RecordIndices)
             {
@@ -115,6 +145,7 @@ namespace MyRM.Storage
                         item.ActiveId = 0;
                         item.ShadowId = 0;
                         item.IsDirty = 0;
+                        item.TransactionId = Guid.Empty;
                     }
                 }
             }

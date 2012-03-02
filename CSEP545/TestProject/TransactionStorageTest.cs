@@ -73,11 +73,11 @@ namespace TestProject
             var db = CreateDatabase();
             TransactionStorage tr = new TransactionStorage(db);
             tr.Write(context, rid, new Resource(rid, 10, 11));
-            Resource res = tr.Read(context, rid);
-            Assert.AreEqual(11, res.getPrice());
+            //Resource res = tr.Read(context, rid);
+            //Assert.AreEqual(11, res.getPrice());
             tr.Abort(context);
-            res = tr.Read(context, rid);
-            Assert.IsNull(res);
+            var res = tr.Read(context, rid);
+            Assert.IsNull(res, "Transaction aborted, but record still there");
         }
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace TestProject
         {
             Transaction context = new Transaction();
             Transaction context1 = new Transaction();
-            RID rid = new RID(RID.Type.FLIGHT, "test");
+            RID rid = new RID(RID.Type.FLIGHT, Guid.NewGuid().ToString().Substring(0, 24));
             var db = CreateDatabase();
             TransactionStorage tr = new TransactionStorage(db);
             tr.Write(context, rid, new Resource(rid, 10, 11));
@@ -105,7 +105,7 @@ namespace TestProject
         /// Also test Write for resource
         ///</summary>
         [TestMethod()]
-        public void DeleteTest()
+        public void WriteDeleteBeforeCommit()
         {
             Transaction context = new Transaction();
             RID rid = new RID(RID.Type.FLIGHT, "test");
@@ -155,7 +155,7 @@ namespace TestProject
 
         private DatabaseFileAccess CreateDatabase()
         {
-            var db = new DatabaseFileAccess("TEST_" + Guid.NewGuid(), false);
+            var db = new DatabaseFileAccess("TEST_" + Guid.NewGuid(), requiresExplictCommit: true);
             db.CreateTable(Constants.ReservationTableName, 96, 36);
             db.CreateTable(Constants.ResourcesTableName, 96, 36);
             return db;
