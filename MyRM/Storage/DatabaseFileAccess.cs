@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -380,6 +379,10 @@ namespace MyRM.Storage
             {
                 CommitPage(tid, page);
             }
+        }
+
+        public void Prepare(Transaction tid)
+        {
         }
 
         public void Commit(Transaction tid)

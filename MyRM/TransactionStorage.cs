@@ -21,6 +21,15 @@ namespace MyRM
         }
 
         /// <summary>
+        /// Prepare the transaction and save changes to durable storage
+        /// </summary>
+        /// <param name="context">Design for supporting multiple transactions</param>
+        public void Prepare(Transaction context)
+        {
+            _database.Prepare(context);
+        }
+
+        /// <summary>
         /// Commit the transaction and remove the shadow
         /// </summary>
         /// <param name="context">Design for supporting multiple transactions</param>

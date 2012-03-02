@@ -15,5 +15,6 @@ namespace MyRM.Storage
         Dictionary<string, Row> ReadAllRecords(Transaction tid, string tableName);
         void Commit(Transaction tid);
         void Abort(Transaction tid);
+        void Prepare(Transaction tid);
     }
 }
