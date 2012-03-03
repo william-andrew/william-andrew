@@ -361,7 +361,7 @@ namespace MyRM.Storage
 
             //save page tableName file
             UpdateShadowIdsForPage(pageTable, page.PageIndex, page.FileId, tid.Id);
-            DiskWritePageTable(tableName, pageTable);
+            DiskWritePageTable(tableName, pageTable); 
 
             //FIX THE DUPLIATE PAGE
             if (UseTwoPhaseCommit)
@@ -380,12 +380,25 @@ namespace MyRM.Storage
             }
             else
             {
-                CommitPages(tid, new List<Page>{page});
+                CommitPages(tid, new List<Page> { page });
             }
         }
 
         public void Prepare(Transaction tid)
         {
+            try
+            {
+                List<Page> list;
+                lock (_tranactionList)
+                {
+                    list = _tranactionList[tid];
+                    //DiskWritePageTable(tableName, pageTable);
+                }
+            }
+            catch (Exception e)
+            {
+                ;
+            }
         }
 
         public void Commit(Transaction tid)
@@ -477,6 +490,28 @@ namespace MyRM.Storage
                 throw new RecordNotFoundException(key);
 
             return DiskReadPage(tableName, pageTableIndex.PageIndex, pageTableIndex.ActiveId);
+        }
+
+        public void PreparePages(Transaction tid, List<Page> pages)
+        {
+            //Save transaction info onto disk
+            foreach (var page in pages)
+            {
+                var pageTable = this.DiskReadPageTable(page.TableName);
+
+                foreach (var item in pageTable.RecordIndices)
+                {
+                    if (item.TransactionId == tid.Id)
+                    {
+                        if (item.IsDirty == 1)
+                        {
+
+                        }
+                    }
+                }
+
+                DiskWritePageTable(page.TableName, pageTable);
+            }
         }
 
         public void CommitPages(Transaction tid, List<Page> pages)

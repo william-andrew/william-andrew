@@ -205,7 +205,7 @@ namespace MyRM
         //we can take a look the standard XA/Open interface.
         public XaResponse Prepare(Transaction context)
         {
-            //TODO: implement actual prepare code
+            _transactionStorage.Prepare(context); 
             return XaResponse.XA_OK;
         }
 
