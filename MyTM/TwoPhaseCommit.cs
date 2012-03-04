@@ -2,6 +2,7 @@
 using TP;
 using System.Threading;
 using System.IO;
+using System;
 
 namespace MyTM
 {
@@ -19,10 +20,15 @@ namespace MyTM
     // 2. redo or undo the changes;
     public static class TwoPhaseCommit
     {
-        private const string LogFileName = "commitedTransaction.log";
+        public const string LogFileName = "commitedTransaction.log";
         private static Dictionary<Transaction, CommitedTransaction> committedTransactions = new Dictionary<Transaction, CommitedTransaction>();
         private static bool isInitialized = false;
         private static object syncRoot = new object();
+        
+        public static bool IsInitialized
+        {
+            get { return isInitialized; }
+        }
 
         /// <summary>
         /// Initialize the class 
@@ -84,6 +90,7 @@ namespace MyTM
         public static CommitedTransaction Commit(Transaction context, ResourceManagerList rms)
         {
             Init();
+            
             CommitedTransaction trans = new CommitedTransaction(context, rms);
             lock (committedTransactions)
             {
@@ -101,14 +108,36 @@ namespace MyTM
             return trans;
         }
 
+        public static void PrintMessage()
+        {
+            foreach (var r in committedTransactions.Values)
+            {
+                if (!string.IsNullOrWhiteSpace(r.Message))
+                {
+                    Console.WriteLine(r.Message);
+                    r.Message = string.Empty;
+                }
+
+            }
+        }
+
         public static void DoneCommit(Transaction context)
         {
             lock (committedTransactions)
             {
+                if (committedTransactions.ContainsKey(context) && !string.IsNullOrWhiteSpace(committedTransactions[context].Message))
+                {
+                    Console.WriteLine(committedTransactions[context].Message);
+                }
                 committedTransactions.Remove(context);
                 // do not flush to log because having extra done transaction does not hurt recovery 
                 // and recovery will correct it when loading the log
             }
+        }
+
+        public static void Abort(Transaction context)
+        {
+            Init();
         }
 
         /// <summary>

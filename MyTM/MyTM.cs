@@ -102,7 +102,7 @@ namespace MyTM
         }
 
         /// <summary>
-        //	 Call from WC in response to a client's commit
+        ///	 Call from WC in response to a client's commit
         /// </summary>
         /// <param name="context"></param>
         public void Commit(TP.Transaction context)
@@ -113,7 +113,6 @@ namespace MyTM
                 {
                     CommitedTransaction trans = TwoPhaseCommit.Commit(context, _resourceManagersEnlistedInTransactions[context]);
                     trans.DoneEvent.WaitOne(TransactionTimeout * 1000);
-                    // TODO: remove the context from the list only in completed call back
                     _resourceManagersEnlistedInTransactions.Remove(context);
                 }
             }
@@ -167,7 +166,7 @@ namespace MyTM
 
                     if (!list.Contains(rm))
                     {
-                        list.Add(rm);
+                        _resourceManagersEnlistedInTransactions[context].Add(rm);
                     }
                 }
                 else
@@ -220,29 +219,12 @@ namespace MyTM
         protected void init(String[] args)
         {
         }
-
-
-        protected void initStorage()
-        {
-            // TODO create commit log
-        }
-
-
-        protected void recovery()
-        {
-            // TODO Abort/commit/garbage collect
-        }
-
-
+        
         protected void startUp()
         {
             // TODO start garbage collector?
         }
 
-
-        protected void readyToServe()
-        {
-        }
 
         class TMParser : CommandLineParser
         {
@@ -278,7 +260,8 @@ namespace MyTM
 
             while (true)
             {
-                Thread.Sleep(100000);
+                Thread.Sleep(2000);
+                TwoPhaseCommit.PrintMessage();
             }
         }
     }

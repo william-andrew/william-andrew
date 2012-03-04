@@ -392,17 +392,18 @@ namespace TP
 		///  </summary>
 		void Shutdown();
 
-		/// <summary>
-		/*   Exit (simulate a failure) after a specified number of disk writes.
-		     Support for this method requires a wrapper around the system's 
-		     write system call that decrements the counter set by this method.
-		     This counter should be set to zero by default, which makes the wrapper
-		     doing nothing.  If the counter is non-zero, the wrapper should decrement								     
-		     it, see if it is zero, and if so call exit().
-		     This method is not part of a transaction. It is intended to simulate an
-			 RM failure. */
-		/// </summary>
-		/// <param name="diskWritesToWait"></param>
-		void SelfDestruct(int diskWritesToWait);
+        /// <summary>
+        ///   Exit (simulate a failure) after a specified number of disk writes.   
+        ///   For example, if you set exitOnWrite to 1, the process will terminate
+        ///   before the first write happens.
+        ///   This is extended version supports selfdestructing at certain number of 
+        ///   writes, prepares, aborts and commits.
+        ///   The counters resets after this call;
+        /// </summary>
+        /// <param name="exitOnWrite"></param>
+        /// <param name="exitOnPrepare"></param>
+        /// <param name="exitOnCommit"></param>
+        /// <param name="exitOnAbort"></param>
+        void SelfDestruct(int exitOnWrite, int exitOnPrepare, int exitOnCommit, int exitOnAbort);
     }
 }
