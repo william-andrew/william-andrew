@@ -3,7 +3,7 @@ using TP;
 
 namespace MyRM.Storage
 {
-    public interface IDatabaseFileAccess
+    public interface ISimpleDatabase
     {
         void CreateTable(string tableName, int rowSize, int keySize = 36);
         string DatabaseName { get; }

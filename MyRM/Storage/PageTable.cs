@@ -7,11 +7,11 @@ namespace MyRM.Storage
     {
         public RecordIndexEntry[] RecordIndices;
 
-        public int PageTableSize = DatabaseFileAccess.DefaultPageSize;
+        public int PageTableSize = SimpleDatabase.DefaultPageSize;
         public int RecordIndexEntrySizeInBytes;
         private readonly int _keySize;
 
-        public PageTable(byte[] data, int pageTableSize = DatabaseFileAccess.DefaultPageSize, int keySize = 36)
+        public PageTable(byte[] data, int pageTableSize = SimpleDatabase.DefaultPageSize, int keySize = 36)
         {
             if (pageTableSize != data.Length)
             {
@@ -20,7 +20,7 @@ namespace MyRM.Storage
 
             PageTableSize = pageTableSize;
             this._keySize = keySize;
-            this.RecordIndexEntrySizeInBytes = keySize + 5 * 4 + 32; //PageIndex, RowIndex, ActiveId, ShadowId, IsDirty, TransactionKey
+            this.RecordIndexEntrySizeInBytes = keySize + 5 * 4 + 32; //PageIndex, RowIndex, ActiveFileId, ShadowFileId, IsDirty, TransactionKey
     
             var encoder = new UTF8Encoding();
             RecordIndices = new RecordIndexEntry[PageTableSize/RecordIndexEntrySizeInBytes];
@@ -37,8 +37,8 @@ namespace MyRM.Storage
                                  Key = encoder.GetString(keyBuffer),
                                  PageIndex = BitConverter.ToInt32(data, p + keySize),
                                  RowIndex = BitConverter.ToInt32(data, p + keySize + 4),
-                                 ActiveId = BitConverter.ToInt32(data, p + keySize + 4 + 4),
-                                 ShadowId = BitConverter.ToInt32(data, p + keySize + 4 + 4 + 4),
+                                 ActiveFileId = BitConverter.ToInt32(data, p + keySize + 4 + 4),
+                                 ShadowFileId = BitConverter.ToInt32(data, p + keySize + 4 + 4 + 4),
                                  IsDirty = BitConverter.ToInt32(data, p + keySize + 4 + 4 + 4 + 4),
                              };
                 Guid tempTid;
@@ -68,10 +68,10 @@ namespace MyRM.Storage
                 byteArray = BitConverter.GetBytes(RecordIndices[i].RowIndex);
                 Array.Copy(byteArray, 0, buffer, p + _keySize + 4, 4);
 
-                byteArray = BitConverter.GetBytes(RecordIndices[i].ActiveId);
+                byteArray = BitConverter.GetBytes(RecordIndices[i].ActiveFileId);
                 Array.Copy(byteArray, 0, buffer, p + _keySize + 4 + 4, 4);
 
-                byteArray = BitConverter.GetBytes(RecordIndices[i].ShadowId);
+                byteArray = BitConverter.GetBytes(RecordIndices[i].ShadowFileId);
                 Array.Copy(byteArray, 0, buffer, p + _keySize + 4 + 4 + 4, 4);
 
                 byteArray = BitConverter.GetBytes(RecordIndices[i].IsDirty);
@@ -99,8 +99,8 @@ namespace MyRM.Storage
                         item.Key = key;
                         item.PageIndex = pageId;
                         item.RowIndex = rowId;
-                        item.ActiveId = -1; // not committed yet
-                        item.ShadowId = pageFileId;
+                        item.ActiveFileId = -1; // not committed yet
+                        item.ShadowFileId = pageFileId;
                         item.IsDirty = 1;
 
                         item.TransactionId = transactionId;
@@ -122,8 +122,8 @@ namespace MyRM.Storage
                 {
                     if (item.Key == index.Key)
                     {
-                        item.ShadowId = item.ActiveId;
-                        item.ActiveId = -2;
+                        item.ShadowFileId = item.ActiveFileId;
+                        item.ActiveFileId = -2; //TODO
                         item.IsDirty = 1;
                         item.TransactionId = transactionId;
                     }
@@ -142,8 +142,8 @@ namespace MyRM.Storage
                         item.Key = new string('\0', _keySize);
                         item.PageIndex = 0;
                         item.RowIndex = 0;
-                        item.ActiveId = 0;
-                        item.ShadowId = 0;
+                        item.ActiveFileId = 0;
+                        item.ShadowFileId = 0;
                         item.IsDirty = 0;
                         item.TransactionId = Guid.Empty;
                     }

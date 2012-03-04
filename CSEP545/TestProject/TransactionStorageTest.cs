@@ -153,9 +153,9 @@ namespace TestProject
             Assert.IsTrue(reservations.SetEquals(actual));
         }
 
-        private DatabaseFileAccess CreateDatabase()
+        private SimpleDatabase CreateDatabase()
         {
-            var db = new DatabaseFileAccess("TEST_" + Guid.NewGuid(), useTwoPhaseCommit: true);
+            var db = new SimpleDatabase("TEST_" + Guid.NewGuid(), useTwoPhaseCommit: true);
             db.CreateTable(Constants.ReservationTableName, 96, 36);
             db.CreateTable(Constants.ResourcesTableName, 96, 36);
             return db;

@@ -14,7 +14,6 @@ namespace MyRM
     public class TransactionStorage
     {
         // Generic data persistence 
-        private readonly IDatabaseFileAccess _database;
         public int EexitOnWrite
         {
             get;
@@ -25,10 +24,11 @@ namespace MyRM
             get;
             private set;
         }
+        private readonly ISimpleDatabase _simpleDatabase;
 
-        public TransactionStorage(IDatabaseFileAccess database)
+        public TransactionStorage(ISimpleDatabase simpleDatabase)
         {
-            _database = database;
+            _simpleDatabase = simpleDatabase;
             ResetCounters();
         }
 
@@ -43,7 +43,7 @@ namespace MyRM
         /// <param name="context">Design for supporting multiple transactions</param>
         public void Prepare(Transaction context)
         {
-            _database.Prepare(context);
+            _simpleDatabase.Prepare(context);
         }
 
         /// <summary>
@@ -52,7 +52,7 @@ namespace MyRM
         /// <param name="context">Design for supporting multiple transactions</param>
         public void Commit(Transaction context)
         {
-            _database.Commit(context);
+            _simpleDatabase.Commit(context);
         }
 
         /// <summary>
@@ -63,7 +63,7 @@ namespace MyRM
         {
             try
             {
-                _database.Abort(context);
+                _simpleDatabase.Abort(context);
             }
             catch(Exception e)
             {
@@ -82,7 +82,7 @@ namespace MyRM
         {
             try
             {
-                var record = _database.ReadRecord(context, Constants.ResourcesTableName, key.ToString());
+                var record = _simpleDatabase.ReadRecord(context, Constants.ResourcesTableName, key.ToString());
                 return SerializationHelper.ConvertRowToResource(record);
             }
             catch(RecordNotFoundException)
@@ -93,7 +93,7 @@ namespace MyRM
 
         public IEnumerable<Resource> GetResources(Transaction context)
         {
-            var rows = _database.ReadAllRecords(context, Constants.ResourcesTableName);
+            var rows = _simpleDatabase.ReadAllRecords(context, Constants.ResourcesTableName);
             return rows.Select(r => SerializationHelper.ConvertRowToResource(r.Value)).ToList();
         }
 
@@ -110,7 +110,7 @@ namespace MyRM
             this.NumberWrites++;
             SelfDestructing();
             var row = SerializationHelper.ConvertResourceToRow(resource);
-            _database.UpsertRecord(context, Constants.ResourcesTableName, key.ToString(), row);
+            _simpleDatabase.UpsertRecord(context, Constants.ResourcesTableName, key.ToString(), row);
         }
 
         /// <summary>
@@ -127,7 +127,7 @@ namespace MyRM
             SelfDestructing();
             try
             {
-                _database.DeleteRecord(context, Constants.ResourcesTableName, key.ToString());
+                _simpleDatabase.DeleteRecord(context, Constants.ResourcesTableName, key.ToString());
                 return true;
             }
             catch(RecordNotFoundException)
@@ -148,11 +148,13 @@ namespace MyRM
         {
             try
             {
-                var record = _database.ReadRecord(context, Constants.ReservationTableName, key.Id.ToString());
+                var record = _simpleDatabase.ReadRecord(context, Constants.ReservationTableName, key.Id.ToString());
+                Console.WriteLine("DB: Read {0} returns {1}", key, record.DataString);
                 return SerializationHelper.ConvertRowToReservation(key.Id.ToString(), record);
             }
             catch (RecordNotFoundException)
             {
+                Console.WriteLine("Read reservation: {0}, returns no record.", key);
                 return null;
             }
         }
@@ -164,7 +166,7 @@ namespace MyRM
         /// <returns></returns>
         public IEnumerable<Customer> GetCustomers(Transaction context)
         {
-            var rows = _database.ReadAllRecords(context, Constants.ReservationTableName);
+            var rows = _simpleDatabase.ReadAllRecords(context, Constants.ReservationTableName);
             return rows.Select(r => new Customer(r.Key)).ToList();
         }
 
@@ -178,7 +180,8 @@ namespace MyRM
             NumberWrites++;
             SelfDestructing();
             var row = SerializationHelper.ConvertReservationToRow(key.Id.ToString(), reserved);
-            _database.UpsertRecord(context, Constants.ReservationTableName, key.Id.ToString(), row);
+            Console.WriteLine("DB: Writing {0} for {1}" , row.DataString, key);
+            _simpleDatabase.UpsertRecord(context, Constants.ReservationTableName, key.Id.ToString(), row);
         }
 
         /// <summary>
@@ -193,7 +196,7 @@ namespace MyRM
             SelfDestructing();
             try
             {
-                _database.DeleteRecord(context, Constants.ReservationTableName, key.Id.ToString());
+                _simpleDatabase.DeleteRecord(context, Constants.ReservationTableName, key.Id.ToString());
                 return true;
             }
             catch (RecordNotFoundException)

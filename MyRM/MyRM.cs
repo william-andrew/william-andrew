@@ -515,7 +515,10 @@ namespace MyRM
             HashSet<RID> r = _transactionStorage.Read(context, c) ?? new HashSet<RID>();
 
             r.Add(resource.getID());
+
+            Console.WriteLine("Reserving flight: Stops={0}",  r.Count);
             _transactionStorage.Write(context, c, r);
+
             resource.decrCount();
             _transactionStorage.Write(context, i, resource);
             return true;
@@ -533,6 +536,7 @@ namespace MyRM
 
             _lockManager.LockForWrite(context, c);
             HashSet<RID> r = _transactionStorage.Read(context, c);
+            Console.WriteLine("Unreserve: {0}", r == null ? 0 : r.Count);
             if (r == null)
             {
                 // silently discard
@@ -604,7 +608,7 @@ namespace MyRM
 
         protected void InitStorage()
         {
-            var database = new DatabaseFileAccess("MYRM_" + _name, true);
+            var database = new SimpleDatabase("MYRM_" + _name, true);
             //TODO: BUGBUG: add validation to check the data and key length
             database.CreateTable(Constants.ReservationTableName, 96, 36);
             database.CreateTable(Constants.ResourcesTableName, 96, 36);
@@ -613,7 +617,7 @@ namespace MyRM
 
         protected void Recovery()
         {
-            // TODO recover state from database file
+            // TODO recover state from simpleDatabase file
         }
 
         protected void StartUp()

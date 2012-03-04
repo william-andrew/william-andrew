@@ -28,12 +28,12 @@ namespace MyRM.Storage
         /// If it is -1, means the record is only in shadow and 
         /// never commited before
         /// </summary>
-        public int ActiveId;
+        public int ActiveFileId;
 
         /// <summary>
-        /// Shawdow file Id
+        /// shadow file Id
         /// </summary>
-        public int ShadowId;
+        public int ShadowFileId;
 
         /// <summary>
         /// The record has been modified and not committed

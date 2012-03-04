@@ -46,7 +46,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Storage\DatabaseFileAccess.cs" />
+    <Compile Include="Storage\OperationType.cs" />
+    <Compile Include="Storage\SimpleDatabase.cs" />
     <Compile Include="Constants.cs" />
     <Compile Include="Storage\DataFileHeader.cs" />
     <Compile Include="MyLM.cs" />
@@ -54,13 +55,14 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resource.cs" />
     <Compile Include="SerializationHelper.cs" />
-    <Compile Include="Storage\IDatabaseFileAccess.cs" />
+    <Compile Include="Storage\ISimpleDatabase.cs" />
     <Compile Include="Storage\Page.cs" />
     <Compile Include="Storage\RecordIndexEntry.cs" />
     <Compile Include="Storage\PageTable.cs" />
     <Compile Include="Storage\RecordNotFoundException.cs" />
     <Compile Include="Storage\Row.cs" />
     <Compile Include="Storage\Table.cs" />
+    <Compile Include="Storage\UpdateLog.cs" />
     <Compile Include="TransactionStorage.cs" />
   </ItemGroup>
   <ItemGroup>
