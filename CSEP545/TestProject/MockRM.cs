@@ -101,8 +101,14 @@ namespace TestProject
         {
         }
 
-        public void SelfDestruct(int diskWritesToWait)
+        #endregion
+
+        #region RM Members
+
+
+        public void SelfDestruct(int writesToWait, int readsToWait, int commitsToWait, int abortsToWait)
         {
+            
         }
 
         #endregion

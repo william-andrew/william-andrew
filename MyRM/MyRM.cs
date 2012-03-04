@@ -5,6 +5,7 @@ using System.Runtime.Remoting.Channels.Http;
 using System.Text;
 using MyRM.Storage;
 using TP;
+using System.Diagnostics;
 
 namespace MyRM
 {
@@ -17,7 +18,40 @@ namespace MyRM
         private TransactionStorage _transactionStorage;
         private string _name;
         static TM _transactionManager;
- 
+        public int VoteNoOnPrepare
+        {
+            get;
+            set;
+        }
+        public int VoteNoOnCommit
+        {
+            get;
+            set;
+        }
+        public int VoteNoOnAbort
+        {
+            get;
+            set;
+        }
+
+        public int NumberCommits
+        {
+            get;
+            private set;
+        }
+
+        public int NumberAborts
+        {
+            get;
+            private set;
+        }
+
+        public int NumberPrepares
+        {
+            get;
+            private set;
+        }
+
         internal class GlobalState
         {
             public enum RunMode
@@ -183,6 +217,11 @@ namespace MyRM
         /// <param name="context"></param>
         public XaResponse Commit(TP.Transaction context)
         {
+            ++NumberCommits;
+            if (NumberCommits >= this.VoteNoOnCommit && this.VoteNoOnCommit != 0)
+            {
+                return XaResponse.XAER_RMERR;
+            }
             // transactionManager.Commit(context);
             _transactionStorage.Commit(context);
             _lockManager.UnlockAll(context);
@@ -195,6 +234,11 @@ namespace MyRM
         /// <param name="context"></param>
         public XaResponse Abort(TP.Transaction context)
         {
+            ++NumberAborts;
+            if (NumberAborts >= this.VoteNoOnAbort && this.VoteNoOnAbort != 0)
+            {
+                return XaResponse.XAER_RMERR;
+            }
             // transactionManager.Abort(context);
             _transactionStorage.Abort(context);
             _lockManager.UnlockAll(context);
@@ -205,6 +249,12 @@ namespace MyRM
         //we can take a look the standard XA/Open interface.
         public XaResponse Prepare(Transaction context)
         {
+            ++NumberPrepares;
+            if (NumberPrepares >= this.VoteNoOnPrepare && this.VoteNoOnPrepare != 0)
+            {
+                return XaResponse.XAER_RMERR;
+            }
+            
             _transactionStorage.Prepare(context); 
             return XaResponse.XA_OK;
         }
@@ -316,17 +366,24 @@ namespace MyRM
         }
 
         /// <summary>
-        /*    Exit after the specified number of disk writes.
-              Support for this method requires a wrapper around _write_ system
-              call that decrements the counter set by this method.
-
-              This counter should be set by default to 0, which implies that the wrapper
-              will do nothing.  If it is non-zero, the wrapper should decrement
-              the counter, see if it becomes zero, and if so, call exit(), otherwise
-              continue to write. */
+        ///   Exit (simulate a failure) after a specified number of disk writes.   
+        ///   For example, if you set exitOnWrite to 1, the process will terminate
+        ///   before the first write happens.
+        ///   This is extended version supports selfdestructing at certain number of 
+        ///   writes, prepares, aborts and commits.
+        ///   The counters resets after this call;
         /// </summary>
-        public void SelfDestruct(int diskWritesToWait)
+        public void SelfDestruct(int exitOnWrite, int voteNoOnPrepare, int voteNoOnCommit, int voteNoOnAbort)
         {
+            this._transactionStorage.EexitOnWrite = exitOnWrite;
+            this.VoteNoOnPrepare = voteNoOnPrepare;
+            this.VoteNoOnAbort = voteNoOnAbort;
+            this.VoteNoOnCommit = voteNoOnCommit;
+            this._transactionStorage.ResetCounters();
+            this.NumberAborts = 0;
+            this.NumberCommits = 0;
+            this.NumberPrepares = 0;
+
         }
 
         /// <summary>

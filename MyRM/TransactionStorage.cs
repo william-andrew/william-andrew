@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MyRM.Storage;
 using TP;
+using System.Diagnostics;
 
 namespace MyRM
 {
@@ -14,10 +15,26 @@ namespace MyRM
     {
         // Generic data persistence 
         private readonly IDatabaseFileAccess _database;
+        public int EexitOnWrite
+        {
+            get;
+            set;
+        }
+        public int NumberWrites
+        {
+            get;
+            private set;
+        }
 
         public TransactionStorage(IDatabaseFileAccess database)
         {
             _database = database;
+            ResetCounters();
+        }
+
+        public void ResetCounters()
+        {
+            this.NumberWrites = 0;
         }
 
         /// <summary>
@@ -90,6 +107,8 @@ namespace MyRM
         /// <returns>success</returns>
         public void Write(Transaction context, RID key, Resource resource)
         {
+            this.NumberWrites++;
+            SelfDestructing();
             var row = SerializationHelper.ConvertResourceToRow(resource);
             _database.UpsertRecord(context, Constants.ResourcesTableName, key.ToString(), row);
         }
@@ -104,6 +123,8 @@ namespace MyRM
         {
             //TransactionData currentShadow = CreateShadowIfNotExists(context);
             //return currentShadow.Resources.Remove(key);
+            this.NumberWrites++;
+            SelfDestructing();
             try
             {
                 _database.DeleteRecord(context, Constants.ResourcesTableName, key.ToString());
@@ -154,6 +175,8 @@ namespace MyRM
         /// <returns>success</returns>
         public void Write(Transaction context, Customer key, HashSet<RID> reserved)
         {
+            NumberWrites++;
+            SelfDestructing();
             var row = SerializationHelper.ConvertReservationToRow(key.Id.ToString(), reserved);
             _database.UpsertRecord(context, Constants.ReservationTableName, key.Id.ToString(), row);
         }
@@ -166,6 +189,8 @@ namespace MyRM
         /// <returns></returns>
         public bool Delete(Transaction context, Customer key)
         {
+            NumberWrites++;
+            SelfDestructing();
             try
             {
                 _database.DeleteRecord(context, Constants.ReservationTableName, key.Id.ToString());
@@ -174,6 +199,15 @@ namespace MyRM
             catch (RecordNotFoundException)
             {
                 return false;
+            }
+        }
+
+
+        protected void SelfDestructing()
+        {
+            if ((EexitOnWrite != 0 && NumberWrites >= EexitOnWrite))
+            {
+                Process.GetCurrentProcess().Kill();
             }
         }
         #endregion

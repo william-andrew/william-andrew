@@ -4,6 +4,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Runtime.Remoting.Channels.Http;
 using System.Runtime.Remoting;
+using System.Net;
 
 namespace MyWC
 {

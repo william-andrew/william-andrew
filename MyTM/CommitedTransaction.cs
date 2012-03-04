@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using TP;
+using System.Net;
 
 namespace MyTM
 {
@@ -10,10 +11,10 @@ namespace MyTM
     {
         private const int maxRetry = 3; 
         private static int expBackoff = 500; // exponential back off starts from 500ms
-        private static int stepTimeout = 50000; // millisecond
+        private static int stepTimeout = 2000; // millisecond
         private List<CommitState> rmCommitStates;
         private AutoResetEvent stepWaitEvent = new AutoResetEvent(false);
-        public string Message = string.Empty; // This is for demo 
+        public string Message = string.Empty;
         public CommitedTransaction(Transaction context, ResourceManagerList rms)
         {
             this.ResouceManagers = rms;
@@ -40,9 +41,9 @@ namespace MyTM
         {
             string result = string.Empty;
             string rmstring = string.Empty;
-            foreach (RM r in ResouceManagers.ResourceManagers)
+            foreach (var r in ResouceManagers.RMNames)
             {
-                rmstring += r.GetName() + ",";
+                rmstring += r + ",";
             }
             result += string.Format("{0}\t{1}\t{2}", Context.Id, State, rmstring);
             return result;
@@ -120,9 +121,10 @@ namespace MyTM
         /// </summary>
         public void StartCommit()
         {
-            bool isStepComplete = WaitStepWithExpBackoff(Prepare);
+            bool isStepComplete = false;
+            Prepare();
 
-            if (isStepComplete)
+            if ((isStepComplete = this.stepWaitEvent.WaitOne(stepTimeout)))
             {
                 TwoPhaseCommit.WriteLog();
                 isStepComplete = WaitStepWithExpBackoff(Commit);
@@ -130,12 +132,14 @@ namespace MyTM
                 if (isStepComplete)
                 {
                     TwoPhaseCommit.WriteLog();
-                    DoneEvent.Set();
                     TwoPhaseCommit.DoneCommit(this.Context);
+                    DoneEvent.Set();
                 }
                 else
                 {
-                    Message += string.Format("2PC:Retry Commit {0}\r", this.Context.Id);
+                    string outstring = string.Format("2PC:Retry Commit {0}\r", this.Context.Id);
+                    this.Message += outstring;
+                    Console.Write(string.Format("2PC:Retry Commit {0}\r", this.Context.Id));
                     WaitStepWithExpBackoff(Commit);
                 }
             }
@@ -143,6 +147,9 @@ namespace MyTM
             {
                 // Presume abort
                 Rollback();
+                TwoPhaseCommit.WriteLog();
+                TwoPhaseCommit.DoneCommit(this.Context);
+                DoneEvent.Set();
             }
         }
 
@@ -183,14 +190,23 @@ namespace MyTM
             {
                 RM r = list[i];
                 int temp = i;
-                Message += string.Format("2PC:Prepare {0}:{1}\r", this.Context.Id, r.GetName());
+                string outstring = string.Format("2PC:Prepare {0}:{1}\r", this.Context.Id, r.GetName());
+                this.Message += outstring;
+                Console.Write(outstring);
                 ThreadPool.QueueUserWorkItem(o =>
                 {
-                    XaResponse response = r.Prepare(this.Context);
-                    if (response == XaResponse.XA_OK)
+                    try
                     {
-                        this.SetState(temp, CommitState.Prepared);
+                        XaResponse response = r.Prepare(this.Context);
+                        if (response == XaResponse.XA_OK)
+                        {
+                            this.SetState(temp, CommitState.Prepared);
+                        }
                     }
+                    catch (WebException)
+                    {
+                    }
+
                 });
             }
         }
@@ -201,15 +217,24 @@ namespace MyTM
             for (int i = 0; i < list.Count; i++)
             {
                 RM r = list[i];
-                Message += string.Format("2PC:Commit {0}:{1}\r", this.Context.Id, r.GetName());
+                string outstring = string.Format("2PC:Commit {0}:{1}\r", this.Context.Id, r.GetName());
+                this.Message += outstring;
+                Console.Write(outstring);
                 int temp = i;
                 ThreadPool.QueueUserWorkItem(o =>
                 {
-                    XaResponse response = r.Commit(this.Context);
-                    if (response == XaResponse.XA_OK)
+                    try
                     {
-                        this.SetState(temp, CommitState.Done);
+                        XaResponse response = r.Commit(this.Context);
+                        if (response == XaResponse.XA_OK)
+                        {
+                            this.SetState(temp, CommitState.Done);
+                        }
                     }
+                    catch (WebException)
+                    {
+                    }
+
                 });
             }
         }
@@ -220,15 +245,22 @@ namespace MyTM
             for (int i = 0; i < list.Count; i++)
             {
                 RM r = list[i];
-                Message += string.Format("2PC:Rollback {0}:{1}\r", this.Context.Id, r.GetName());
+                string outstring = string.Format("2PC:Rollback {0}:{1}\r", this.Context.Id, this.ResouceManagers.RMNames[i]);
+                this.Message += outstring;
+                Console.Write(outstring);
                 int temp = i;
                 ThreadPool.QueueUserWorkItem(o =>
                 {
-                    XaResponse response = r.Abort(this.Context);
-                    if (response == XaResponse.XA_OK)
+                    try
                     {
-                        this.SetState(temp, CommitState.Rollbacked);
+                        r.Abort(this.Context);
                     }
+                    catch (WebException)
+                    {
+                    }
+                    // presume abort, if we don't check return of the abort 
+                    // Once the abort message is sent, it is consider done.
+                    this.SetState(temp, CommitState.Rollbacked);
                 });
             }
         }
@@ -244,7 +276,9 @@ namespace MyTM
                 Thread.Sleep(sleeptime);
                 sleeptime *= 2;
                 retry++;
-                Message += string.Format("Sleep and retry {0}\r", retry);
+                string outstring = string.Format("Sleep and retry {0}\r", retry);
+                this.Message += outstring;
+                Console.Write(outstring);
                 action();
             }
 

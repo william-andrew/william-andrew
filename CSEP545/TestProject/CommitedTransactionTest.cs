@@ -85,7 +85,7 @@ namespace TestProject
             CommitedTransaction_Accessor target = new CommitedTransaction_Accessor(context, rms);
             CommitedTransaction_Accessor.stepTimeout = 10;
             target.StartCommit();
-            Assert.AreEqual(string.Format("2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\rSleep and retry 1\r2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\rSleep and retry 2\r2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\rSleep and retry 3\r2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\r2PC:Rollback {0}:MockRM\r2PC:Rollback {0}:test\r", context.Id), target.Message);
+            Assert.AreEqual(string.Format("2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\r2PC:Rollback {0}:MockRM\r2PC:Rollback {0}:test\r", context.Id), target.Message);
         }
 
         /// <summary>
