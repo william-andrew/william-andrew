@@ -389,63 +389,6 @@ namespace TestProject
             tm.Commit(context);
         }
 
-
-        /// <summary>
-        ///A test for Cancellation
-        ///</summary>
-        [TestMethod]
-        public void CancelTwoFlights()
-        {
-            var wc = new MyWC.MyWC();
-            var tm = new MyTM.MyTM();
-            var rmf = new MyRM.MyRM();
-            var rmc = new MyRM.MyRM();
-            var rmr = new MyRM.MyRM();
-
-            rmf.SetName("flight");
-            rmf.TransactionManager = tm;
-
-            rmc.SetName("car");
-            rmc.TransactionManager = tm;
-
-            rmr.SetName("room");
-            rmr.TransactionManager = tm;
-
-            tm.Register(rmf);
-            tm.Register(rmc);
-            tm.Register(rmr);
-
-            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
-            MyWC.MyWC.Cars = tm.GetResourceMananger("car");
-            MyWC.MyWC.Rooms = tm.GetResourceMananger("room");
-            MyWC.MyWC.TransactionManager = tm;
-
-            var context = wc.Start();
-            wc.AddSeats(context, "SEA-JFK", 1000, 200);
-            wc.AddSeats(context, "JFK-PVG", 500, 150);
-            tm.Commit(context);
-
-            var c1 = new Customer();
-            Assert.IsTrue(wc.ReserveItinerary(c1, new[] { "SEA-JFK", "JFK-PVG" }, "NY", false, false));
-
-            context = wc.Start();
-            Assert.AreEqual(c1, wc.ListCustomers(context)[0]);
-            Assert.IsFalse(String.IsNullOrEmpty(wc.QueryItinerary(context, c1)), "Itinerary not found");
-            wc.Commit(context);
-
-            context = wc.Start();
-            Assert.AreEqual(1000 - 1, wc.QueryFlight(context, "SEA-JFK"));
-            Assert.AreEqual(500 - 1, wc.QueryFlight(context, "JFK-PVG"));
-            wc.Commit(context);
-
-            wc.CancelItinerary(c1);
-
-            context = wc.Start();
-            Assert.AreEqual(500, wc.QueryFlight(context, "JFK-PVG"), "incorrect flight total");
-            Assert.AreEqual(1000, wc.QueryFlight(context, "SEA-JFK"), "incorrect flight total");
-            wc.Commit(context);
-        }
-
         /// <summary>
         ///A test for Reservation and Cancellation
         ///</summary>

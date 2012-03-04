@@ -119,6 +119,263 @@ namespace TestProject
         }
 
         [TestMethod]
+        public void ReadShouldIgnoreUncommittedFromOtherTransactions()
+        {
+            var db = new SimpleDatabase_Accessor("2PC0", true);
+            db.Initialize();
+            const int rowSize = 100;
+            var key1 = new string('1', 36);
+            var key2 = new string('2', 36);
+
+            var encoder = new UTF8Encoding();
+            var tid = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+                                                            {
+                                                                Data = encoder.GetBytes("Seattle, 123")
+                                                            });
+
+            db.InsertRecord(tid, "Inventory.Car", key2, new Row(rowSize)
+                                                            {
+                                                                Data = encoder.GetBytes("New York, 456")
+                                                            });
+
+            var rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(0, rows.Keys.Count);
+        }
+
+        [TestMethod]
+        public void ReadShouldReadUncommittedRecordFromSameTransaction()
+        {
+            var db = new SimpleDatabase_Accessor("2PC1", true);
+            db.Initialize();
+            const int rowSize = 100;
+            var key1 = new string('1', 36);
+            var key2 = new string('2', 36);
+
+            var encoder = new UTF8Encoding();
+            var tid = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+                                                            {
+                                                                Data = encoder.GetBytes("Seattle, 123")
+                                                            });
+
+            db.InsertRecord(tid, "Inventory.Car", key2, new Row(rowSize)
+                                                            {
+                                                                Data = encoder.GetBytes("New York, 456")
+                                                            });
+
+            var rows = db.ReadAllRecords(tid, "Inventory.Car");
+            Assert.AreEqual(2, rows.Keys.Count);
+        }
+
+        [TestMethod]
+        public void ReadShouldReadUncommittedDeleteFromOtherTransaction()
+        {
+            var db = new SimpleDatabase_Accessor("2PC2", true);
+            db.Initialize();
+            const int rowSize = 100;
+            var key1 = new string('1', 36);
+            var key2 = new string('2', 36);
+
+            var encoder = new UTF8Encoding();
+            var tid = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+                                                            {
+                                                                Data = encoder.GetBytes("Seattle, 123")
+                                                            });
+
+            db.InsertRecord(tid, "Inventory.Car", key2, new Row(rowSize)
+                                                            {
+                                                                Data = encoder.GetBytes("New York, 456")
+                                                            });
+
+            db.Prepare(tid);
+            db.Commit(tid);
+
+            var rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(2, rows.Keys.Count);
+
+            var tid2 = new Transaction();
+            db.DeleteRecord(tid2, "Inventory.Car", key1);
+            rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(2, rows.Keys.Count);
+
+            rows = db.ReadAllRecords(tid2, "Inventory.Car");
+            Assert.AreEqual(1, rows.Keys.Count);
+
+            db.Prepare(tid2);
+            db.Commit(tid2);
+
+            rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(1, rows.Keys.Count);
+        }
+
+        [TestMethod]
+        public void InsertUpdateUpdateUpdateTest()
+        {
+            var db = new SimpleDatabase_Accessor("2PC3", true);
+            db.Initialize();
+            const int rowSize = 100;
+            var key1 = new string('1', 36);
+
+            var encoder = new UTF8Encoding();
+            var tid = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAA")
+            });
+
+            db.UpdateRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAABBB")
+            });
+
+            db.UpdateRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAABBBCCC")
+            });
+
+            var rows = db.ReadAllRecords(tid, "Inventory.Car");
+            Assert.AreEqual(1, rows.Keys.Count);
+
+            rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(0, rows.Keys.Count);
+
+            db.Prepare(tid);
+            db.Commit(tid);
+
+            rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(1, rows.Keys.Count);
+
+            Assert.AreEqual("AAABBBCCC", rows[key1].DataString);
+        }
+
+        [TestMethod]
+        public void InsertCommitUpdateUpdateUpdateTest()
+        {
+            var db = new SimpleDatabase_Accessor("2PC4", true);
+            db.Initialize();
+            const int rowSize = 100;
+            var key1 = new string('1', 36);
+
+            var encoder = new UTF8Encoding();
+            var tid = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAA")
+            });
+
+            db.Prepare(tid);
+            db.Commit(tid);
+
+            var rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(1, rows.Keys.Count);
+
+            db.UpdateRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAABBB")
+            });
+
+            db.UpdateRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAABBBCCC")
+            });
+
+            db.UpdateRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAABBBCCCDDD")
+            });
+
+            db.Prepare(tid);
+            db.Commit(tid);
+
+            rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(1, rows.Keys.Count);
+
+            Assert.AreEqual("AAABBBCCCDDD", rows[key1].DataString);
+        }
+
+        [TestMethod]
+        public void PrepareCommitAbortWithInvalidTransactionIdsTest()
+        {
+            var db = new SimpleDatabase_Accessor("2PC5", true);
+            db.Initialize();
+            const int rowSize = 100;
+
+            var tid1 = new Transaction();
+            var tid2 = new Transaction();
+            var tid3 = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.Prepare(tid1);
+            db.Prepare(tid1);
+            db.Commit(tid2);
+            db.Commit(tid2);
+            db.Abort(tid3);
+            db.Abort(tid3);
+        }
+
+        [TestMethod]
+        public void InsertCommitTest()
+        {
+            var db = new SimpleDatabase_Accessor("2PC6", true);
+            db.Initialize();
+            const int rowSize = 100;
+            var key1 = new string('1', 36);
+
+            var encoder = new UTF8Encoding();
+            var tid = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAA")
+            });
+
+            db.Prepare(tid);
+            db.Commit(tid);
+
+            var rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(1, rows.Keys.Count);
+
+            Assert.AreEqual("AAA", rows[key1].DataString);
+        }
+
+        [TestMethod]
+        public void InsertAbortTest()
+        {
+            var db = new SimpleDatabase_Accessor("2PC7", true);
+            db.Initialize();
+            const int rowSize = 100;
+            var key1 = new string('1', 36);
+
+            var encoder = new UTF8Encoding();
+            var tid = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAA")
+            });
+
+            db.Prepare(tid);
+            db.Abort(tid);
+
+            var rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(0, rows.Keys.Count);
+        }
+
+        [TestMethod]
         public void InsertUpdateRecord()
         {
             var db = new SimpleDatabase_Accessor("EEE", false);
@@ -219,14 +476,17 @@ namespace TestProject
 
             db.DeleteRecord(tid, "Inventory.Car", key4);
 
+            RecordNotFoundException exception = null;
             try
             {
                 row = db.ReadRecord(tid, "Inventory.Car", key4);
                 Assert.Fail();
             }
-            catch (RecordNotFoundException)
+            catch (RecordNotFoundException e)
             {
+                exception = e;
             }
+            Assert.IsNotNull(exception);
 
             row = db.ReadRecord(tid, "Inventory.Car", key1);
             Assert.AreEqual("Seattle, key1", row.DataString);

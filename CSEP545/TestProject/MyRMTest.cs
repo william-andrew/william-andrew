@@ -32,6 +32,8 @@ namespace TestProject
             int count = 1; 
             int price = 3; 
             rm.Add(context, i, count, price);
+            rm.Prepare(context);
+            rm.Commit(context);
             Assert.AreEqual(price, rm.QueryPrice(context, i));
         }
 
@@ -51,6 +53,7 @@ namespace TestProject
             int count = 1;
             int price = 3;
             rm.Add(context, i, count, price);
+            rm.Prepare(context);
             rm.Commit(context);
             Assert.AreEqual(price, rm.QueryPrice(context1, i));
         }

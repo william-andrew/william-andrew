@@ -99,7 +99,7 @@ namespace MyRM.Storage
                         item.Key = key;
                         item.PageIndex = pageId;
                         item.RowIndex = rowId;
-                        item.ActiveFileId = -1; // not committed yet
+                        item.ActiveFileId = SimpleDatabase.InsertedButNotCommitted;
                         item.ShadowFileId = pageFileId;
                         item.IsDirty = 1;
 
@@ -123,7 +123,7 @@ namespace MyRM.Storage
                     if (item.Key == index.Key)
                     {
                         item.ShadowFileId = item.ActiveFileId;
-                        item.ActiveFileId = -2; //TODO
+                        item.ActiveFileId = SimpleDatabase.DeletededButNotCommitted;
                         item.IsDirty = 1;
                         item.TransactionId = transactionId;
                     }

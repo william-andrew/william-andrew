@@ -3,7 +3,7 @@
 namespace MyRM.Storage
 {
     //In memory log that records a single change
-    public struct UpdateLog
+    public class UpdateLog
     {
         public Guid TransactionId;
         public Row Image;

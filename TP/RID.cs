@@ -64,7 +64,7 @@ namespace TP
     
     public RID(Type type,String name) {
         if ( type == Type.INVALID || name == null || name.Length > MAX_NAME_LENGTH ) {
-            throw new ArgumentException();
+            throw new ArgumentException(String.Format("type is invalid={0}, name is ={1}", type == Type.INVALID, name ?? "null"));
         }
         this.type = type;
         this.name = name;

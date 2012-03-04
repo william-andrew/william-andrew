@@ -95,6 +95,7 @@ namespace TestProject
             tr.Write(context, rid, new Resource(rid, 10, 11));
             Resource res = tr.Read(context1, rid);
             Assert.IsNull(res);
+            tr.Prepare(context);
             tr.Commit(context);
             res = tr.Read(context, rid);
             Assert.AreEqual(11, res.getPrice());
