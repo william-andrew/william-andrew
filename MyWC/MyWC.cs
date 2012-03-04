@@ -62,9 +62,20 @@ namespace MyWC
             TP.Transaction tid = TransactionManager.Start();
             try
             {
-                Flights.UnReserve(tid, customer);
-                Cars.UnReserve(tid, customer);
-                Rooms.UnReserve(tid, customer);
+                if (Flights != null)
+                {
+                    Flights.UnReserve(tid, customer);
+                }
+
+                if (Cars != null)
+                {
+                    Cars.UnReserve(tid, customer);
+                }
+
+                if (Rooms != null)
+                {
+                    Rooms.UnReserve(tid, customer);
+                }
 
                 TransactionManager.Commit(tid);
             }
@@ -186,14 +197,26 @@ namespace MyWC
         public Customer[] ListCustomers(Transaction context)
         {
             var customers = new HashSet<Customer>();
-            foreach (Customer c in Flights.ListCustomers(context))
-                customers.Add(c);
-            foreach (Customer c in Cars.ListCustomers(context))
-                customers.Add(c);
-            foreach (Customer c in Rooms.ListCustomers(context))
-                customers.Add(c);
-            var cs = new Customer[customers.Count];
 
+            if (Flights != null)
+            {
+                foreach (Customer c in Flights.ListCustomers(context))
+                    customers.Add(c);
+            }
+
+            if (Cars != null)
+            {
+                foreach (Customer c in Cars.ListCustomers(context))
+                    customers.Add(c);
+            }
+
+            if (Rooms != null)
+            {
+                foreach (Customer c in Rooms.ListCustomers(context))
+                    customers.Add(c);
+            }
+            
+            var cs = new Customer[customers.Count];
             customers.CopyTo(cs);
             return cs;
         }

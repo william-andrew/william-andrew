@@ -8,7 +8,7 @@ using TP;
 namespace TestProject
 {
     [TestClass]
-    public class DatabaseFileAccessTest
+    public class SimpleDatabaseTest
     {
         readonly UTF8Encoding _encoder = new UTF8Encoding();
 
@@ -25,8 +25,8 @@ namespace TestProject
         [TestMethod]
         public void IndexTest()
         {
-            var target = new DatabaseFileAccess_Accessor("RRR", false);
-            target.CreateTableFile("Car", 64, 1024, 128);
+            var target = new SimpleDatabase_Accessor("RRR", false, true);
+            target.CreateTable("Car", 96, 36);
             PageTable pt = target.DiskReadPageTable("Car");
             pt.InsertIndex("aa", 1, 1, 1, Guid.Empty);
             pt.InsertIndex("bb", 1, 1, 1, Guid.Empty);
@@ -43,7 +43,7 @@ namespace TestProject
         [TestMethod]
         public void PageReadWriteTest()
         {
-            var target = new DatabaseFileAccess_Accessor("AAA", false);
+            var target = new SimpleDatabase_Accessor("AAA", false);
             target.CreateTableFile("Car", 64, 1024, 128);
 
             var a = target.ReadDataFileHeader("Car", 0);
@@ -84,7 +84,7 @@ namespace TestProject
         [TestMethod]
         public void ReadPageTable()
         {
-            var db = new DatabaseFileAccess_Accessor("CCC", false);
+            var db = new SimpleDatabase_Accessor("CCC", false);
             db.Initialize();
             var key = Guid.NewGuid().ToString();
 
@@ -97,7 +97,7 @@ namespace TestProject
             pt.RecordIndices[0].Key = key;
             pt.RecordIndices[0].PageIndex = pageIndex;
             pt.RecordIndices[0].RowIndex = rowIndex;
-            pt.RecordIndices[0].ActiveId = fileId;
+            pt.RecordIndices[0].ActiveFileId = fileId;
 
             db.DiskWritePageTable("Inventory.Car", pt);
 
@@ -105,14 +105,14 @@ namespace TestProject
             Assert.AreEqual(pt.RecordIndices[0].Key, key);
             Assert.AreEqual(pt.RecordIndices[0].PageIndex, pageIndex);
             Assert.AreEqual(pt.RecordIndices[0].RowIndex, rowIndex);
-            Assert.AreEqual(pt.RecordIndices[0].ActiveId, fileId);
+            Assert.AreEqual(pt.RecordIndices[0].ActiveFileId, fileId);
         }
 
         [TestMethod]
         [ExpectedException(typeof(RecordNotFoundException))]
         public void ReadPageRecordNotFound()
         {
-            var db = new DatabaseFileAccess_Accessor("DDD", true);
+            var db = new SimpleDatabase_Accessor("DDD", true);
             db.Initialize();
             db.CreateTable("Inventory.Car", 100);
             db.ReadPage("Inventory.Car", "key");
@@ -121,7 +121,7 @@ namespace TestProject
         [TestMethod]
         public void InsertUpdateRecord()
         {
-            var db = new DatabaseFileAccess_Accessor("EEE", false);
+            var db = new SimpleDatabase_Accessor("EEE", false);
             db.Initialize();
             const int rowSize = 100;
             var key1 = new string('1', 36);
@@ -258,7 +258,7 @@ namespace TestProject
         [TestMethod]
         public void PageAllocationTest()
         {
-            var db = new DatabaseFileAccess_Accessor("MMM", false);
+            var db = new SimpleDatabase_Accessor("MMM", false);
             db.Initialize();
             const int rowSize = 100;
 

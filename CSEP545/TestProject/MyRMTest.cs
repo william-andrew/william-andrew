@@ -129,7 +129,7 @@ namespace TestProject
 
         public static MyRM.MyRM_Accessor MockRM()
         {
-            var db = new DatabaseFileAccess("file", true);
+            var db = new SimpleDatabase("file", true);
             db.CreateTable(Constants.ReservationTableName, 36);
             db.CreateTable(Constants.ResourcesTableName, 36);
             var tm = new MyTM.MyTM();

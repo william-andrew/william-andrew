@@ -7,7 +7,7 @@ namespace MyRM.Storage
     //GetRow               {row 0}
     //GetRow               {row n}
     /// <summary>
-    /// Represents a database Page.
+    /// Represents a simpleDatabase Page.
     /// </summary>
     public class Page
     {
@@ -24,7 +24,7 @@ namespace MyRM.Storage
         private Row[] _rows;
         private readonly UTF8Encoding _encoder = new UTF8Encoding();
 
-        public const int PageHeadSize = DatabaseFileAccess.PageHeadSize; // {P$}{Page Index}{NextFreeRowIndex}
+        public const int PageHeadSize = SimpleDatabase.PageHeaderSize; // {P$}{Page Index}{NextFreeRowIndex}
 
         public Page(DataFileHeader dataFileHeader)
         {
