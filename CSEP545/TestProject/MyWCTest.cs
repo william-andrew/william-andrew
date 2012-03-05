@@ -70,10 +70,10 @@ namespace TestProject
             var wc = new MyWC.MyWC();
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
-            rm.SetName("flight");
+            rm.SetName("flight_000");
             rm.TransactionManager = tm;
             tm.Register(rm);
-            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight_000");
 
             var context = tm.Start();
             var flights = wc.ListFlights(context);
@@ -115,10 +115,10 @@ namespace TestProject
             var wc = new MyWC.MyWC();
             var tm = new MyTM.MyTM();
             var rm = new MyRM.MyRM();
-            rm.SetName("flight");
+            rm.SetName("flight_001");
             rm.TransactionManager = tm;
             tm.Register(rm);
-            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight_001");
 
             var context = tm.Start();
             Assert.IsTrue(wc.AddSeats(context, "FLK", 100, 550));
@@ -154,43 +154,43 @@ namespace TestProject
 
             var context = tm.Start();
             Assert.IsTrue(wc.AddRooms(context, "SEATTLE", 100, 66));
-            Assert.IsTrue(wc.AddRooms(context, "BEIJING", 200, 220));
+            Assert.IsTrue(wc.AddRooms(context, "HONOLULU", 200, 220));
             tm.Commit(context);
 
             context = tm.Start();
             Assert.AreEqual(100, wc.QueryRoom(context, "SEATTLE"));
             Assert.AreEqual(66, wc.QueryRoomPrice(context, "SEATTLE"));
 
-            Assert.AreEqual(200, wc.QueryRoom(context, "BEIJING"));
-            Assert.AreEqual(220, wc.QueryRoomPrice(context, "BEIJING"));
+            Assert.AreEqual(200, wc.QueryRoom(context, "HONOLULU"));
+            Assert.AreEqual(220, wc.QueryRoomPrice(context, "HONOLULU"));
             tm.Commit(context);
 
             //add rooms
             context = tm.Start();
             Assert.IsTrue(wc.AddRooms(context, "SEATTLE", 10, 55));
-            Assert.IsTrue(wc.AddRooms(context, "BEIJING", 20, 110));
+            Assert.IsTrue(wc.AddRooms(context, "HONOLULU", 20, 110));
             tm.Commit(context);
 
             context = tm.Start();
             Assert.AreEqual(100 + 10, wc.QueryRoom(context, "SEATTLE"));
             Assert.AreEqual(55, wc.QueryRoomPrice(context, "SEATTLE"));
 
-            Assert.AreEqual(220, wc.QueryRoom(context, "BEIJING"));
-            Assert.AreEqual(110, wc.QueryRoomPrice(context, "BEIJING"));
+            Assert.AreEqual(220, wc.QueryRoom(context, "HONOLULU"));
+            Assert.AreEqual(110, wc.QueryRoomPrice(context, "HONOLULU"));
             tm.Commit(context);
 
             //delete rooms
             context = tm.Start();
             Assert.IsTrue(wc.DeleteRooms(context, "SEATTLE", 5));
-            Assert.IsTrue(wc.DeleteRooms(context, "BEIJING", 10));
+            Assert.IsTrue(wc.DeleteRooms(context, "HONOLULU", 10));
             tm.Commit(context);
 
             context = tm.Start();
             Assert.AreEqual(100 + 10 - 5, wc.QueryRoom(context, "SEATTLE"));
             Assert.AreEqual(55, wc.QueryRoomPrice(context, "SEATTLE"));
             
-            Assert.AreEqual(220 - 10, wc.QueryRoom(context, "BEIJING"));
-            Assert.AreEqual(110, wc.QueryRoomPrice(context, "BEIJING"));
+            Assert.AreEqual(220 - 10, wc.QueryRoom(context, "HONOLULU"));
+            Assert.AreEqual(110, wc.QueryRoomPrice(context, "HONOLULU"));
             tm.Commit(context);
         }
 
@@ -210,43 +210,43 @@ namespace TestProject
 
             var context = tm.Start();
             Assert.IsTrue(wc.AddCars(context, "SEATTLE", 100, 66));
-            Assert.IsTrue(wc.AddCars(context, "BEIJING", 200, 220));
+            Assert.IsTrue(wc.AddCars(context, "HONOLULU", 200, 220));
             tm.Commit(context);
 
             context = tm.Start();
             Assert.AreEqual(100, wc.QueryCar(context, "SEATTLE"));
             Assert.AreEqual(66, wc.QueryCarPrice(context, "SEATTLE"));
 
-            Assert.AreEqual(200, wc.QueryCar(context, "BEIJING"));
-            Assert.AreEqual(220, wc.QueryCarPrice(context, "BEIJING"));
+            Assert.AreEqual(200, wc.QueryCar(context, "HONOLULU"));
+            Assert.AreEqual(220, wc.QueryCarPrice(context, "HONOLULU"));
             tm.Commit(context);
 
             //add rooms
             context = tm.Start();
             Assert.IsTrue(wc.AddCars(context, "SEATTLE", 10, 55));
-            Assert.IsTrue(wc.AddCars(context, "BEIJING", 20, 110));
+            Assert.IsTrue(wc.AddCars(context, "HONOLULU", 20, 110));
             tm.Commit(context);
 
             context = tm.Start();
             Assert.AreEqual(100 + 10, wc.QueryCar(context, "SEATTLE"));
             Assert.AreEqual(55, wc.QueryCarPrice(context, "SEATTLE"));
 
-            Assert.AreEqual(220, wc.QueryCar(context, "BEIJING"));
-            Assert.AreEqual(110, wc.QueryCarPrice(context, "BEIJING"));
+            Assert.AreEqual(220, wc.QueryCar(context, "HONOLULU"));
+            Assert.AreEqual(110, wc.QueryCarPrice(context, "HONOLULU"));
             tm.Commit(context);
 
             //delete rooms
             context = tm.Start();
             Assert.IsTrue(wc.DeleteCars(context, "SEATTLE", 5));
-            Assert.IsTrue(wc.DeleteCars(context, "BEIJING", 10));
+            Assert.IsTrue(wc.DeleteCars(context, "HONOLULU", 10));
             tm.Commit(context);
 
             context = tm.Start();
             Assert.AreEqual(100 + 10 - 5, wc.QueryCar(context, "SEATTLE"));
             Assert.AreEqual(55, wc.QueryCarPrice(context, "SEATTLE"));
 
-            Assert.AreEqual(220 - 10, wc.QueryCar(context, "BEIJING"));
-            Assert.AreEqual(110, wc.QueryCarPrice(context, "BEIJING"));
+            Assert.AreEqual(220 - 10, wc.QueryCar(context, "HONOLULU"));
+            Assert.AreEqual(110, wc.QueryCarPrice(context, "HONOLULU"));
             tm.Commit(context);
         }
 

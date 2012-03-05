@@ -27,6 +27,7 @@ namespace TestProject
         public void AddTest()
         {
             MyRM.MyRM_Accessor rm = MockRM();
+            rm.SetName("AddTest");
             Transaction context = new Transaction(); 
             RID i = new RID(RID.Type.ROOM, "test1");
             int count = 1; 
@@ -45,8 +46,7 @@ namespace TestProject
         public void CommitTest()
         {
             MyRM.MyRM_Accessor rm = MockRM();
-            
-            rm.SetName("test");
+            rm.SetName("CommitTest");
             Transaction context = new Transaction();
             Transaction context1 = new Transaction();
             RID i = new RID(RID.Type.ROOM, "test1");
@@ -67,7 +67,7 @@ namespace TestProject
         public void DeleteTest()
         {
             MyRM.MyRM_Accessor rm = MockRM();
-            rm.SetName("test" + Guid.NewGuid());
+            rm.SetName("DeleteTest" + Guid.NewGuid());
             Transaction context = new Transaction();
             Customer c = new Customer();
             RID rid = new RID(RID.Type.ROOM, "test1");
@@ -113,6 +113,7 @@ namespace TestProject
         public void UnReserveTest()
         {
             MyRM.MyRM_Accessor rm = MockRM();
+            rm.SetName("UnReserveTest");
             Transaction context = new Transaction();
             Customer c = new Customer();
             RID rid = new RID(RID.Type.ROOM, "test1");
