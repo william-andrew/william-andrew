@@ -57,6 +57,7 @@ namespace TestProject
                 sw.Write(log);
             }
 
+            TwoPhaseCommit_Accessor.isInitialized = false;
             Transaction context = new Transaction();
             ResourceManagerList rms = new ResourceManagerList(MyRMTest.MockRM());
             CommitedTransaction actual;

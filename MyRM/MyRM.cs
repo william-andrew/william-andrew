@@ -6,6 +6,8 @@ using System.Text;
 using MyRM.Storage;
 using TP;
 using System.Diagnostics;
+using System.Net;
+using System.Threading;
 
 namespace MyRM
 {
@@ -18,6 +20,9 @@ namespace MyRM
         private TransactionStorage _transactionStorage;
         private string _name;
         static TM _transactionManager;
+        static string tmUrl = string.Empty;
+        static string[] urls;
+        private static bool isReady = false;
         public int VoteNoOnPrepare
         {
             get;
@@ -111,6 +116,14 @@ namespace MyRM
             return _name;
         }
 
+        private void WaitForReady()
+        {
+            while (!isReady)
+            {
+                Thread.Sleep(1000);
+            }
+        }
+
         // Property injection for testing only
         public TM TransactionManager
         {
@@ -160,20 +173,18 @@ namespace MyRM
             {
                 while (_transactionManager == null)
                 {
+                    tmUrl = parser["tm"];
                     try
                     {
-                        _transactionManager = (TP.TM)System.Activator.GetObject(typeof(TP.TM), parser["tm"]);
+                        _transactionManager = (TP.TM)System.Activator.GetObject(typeof(TP.TM), tmUrl);
 
-                        Transaction tid = _transactionManager.Start();
-                        string[] urls = channel.GetUrlsForUri("RM.soap");
+                        _transactionManager.Ping();
+                        urls = channel.GetUrlsForUri("RM.soap");
                         foreach (string url in urls)
                         {
                             _transactionManager.Register(url + "$" + GlobalState.Name);
 
                         }
-
-                        _transactionManager.Abort(tid);
-
                     }
                     catch (ArgumentException)
                     {
@@ -187,7 +198,20 @@ namespace MyRM
             Console.WriteLine("{0} RM: Transaction Manager retrieved at {1}", GlobalState.Name, parser["tm"]);
 
             while (GlobalState.Mode == GlobalState.RunMode.Loop)
+            {
+                try
+                {
+                    _transactionManager.Ping();
+                }
+                catch(WebException)
+                {
+                    _transactionManager = null;
+                    ReconnectToTM();
+                }
+                isReady = true;
                 System.Threading.Thread.Sleep(2000);
+                    
+            }
 
             int loopCount = 0;
 
@@ -200,7 +224,37 @@ namespace MyRM
 
             Console.WriteLine("{0}: Exitting", GlobalState.Name);
         }
-     
+
+        /// <summary>
+        /// try to reconnect to TM after tm failed. It need to register itself to TM as well
+        /// </summary>
+        public static void ReconnectToTM()
+        {
+            while (_transactionManager == null)
+            {
+                Console.WriteLine("Trying to reconnect to TM");
+                _transactionManager = (TP.TM)System.Activator.GetObject(typeof(TP.TM), tmUrl);
+
+                try
+                {
+                    _transactionManager.Ping();
+                    foreach (string url in urls)
+                    {
+                        _transactionManager.Register(url + "$" + GlobalState.Name);
+
+                    }
+                }
+                catch (WebException)
+                {
+                    _transactionManager = null;
+                    Console.WriteLine("Waiting 1 second for Transaction Manager \"{0}\"", tmUrl);
+                    System.Threading.Thread.Sleep(1000);
+                }
+
+            }
+            Console.WriteLine("Connected to Transaction Manager \"{0}\"", tmUrl);
+        }
+
         /// <summary>
         /// Currently does not involve TM, will do it in later step
         /// Call to TM to enlist for distributed transaction 
@@ -208,7 +262,17 @@ namespace MyRM
         /// <param name="context"></param>
         public void Enlist(TP.Transaction context)
         {
-             _transactionManager.Enlist(context, this.GetName());
+            WaitForReady();
+            try
+            {
+                //_transactionManager = (TP.TM)System.Activator.GetObject(typeof(TP.TM), tmUrl);
+                _transactionManager.Enlist(context, this.GetName());
+            }
+            catch (WebException)
+            {
+                _transactionManager = null;
+                ReconnectToTM();
+            }
         }
 
         /// <summary>
@@ -217,6 +281,7 @@ namespace MyRM
         /// <param name="context"></param>
         public XaResponse Commit(TP.Transaction context)
         {
+            WaitForReady();
             ++NumberCommits;
             if (NumberCommits >= this.VoteNoOnCommit && this.VoteNoOnCommit != 0)
             {
@@ -234,6 +299,7 @@ namespace MyRM
         /// <param name="context"></param>
         public XaResponse Abort(TP.Transaction context)
         {
+            WaitForReady();
             ++NumberAborts;
             if (NumberAborts >= this.VoteNoOnAbort && this.VoteNoOnAbort != 0)
             {
@@ -249,6 +315,7 @@ namespace MyRM
         //we can take a look the standard XA/Open interface.
         public XaResponse Prepare(Transaction context)
         {
+            WaitForReady();
             ++NumberPrepares;
             if (NumberPrepares >= this.VoteNoOnPrepare && this.VoteNoOnPrepare != 0)
             {
@@ -270,6 +337,7 @@ namespace MyRM
         /// <returns></returns>
         public bool Add(TP.Transaction context, TP.RID i, int count, int price)
         {
+            WaitForReady();
             Enlist(context);
 
             _lockManager.LockForWrite(context, i);
@@ -297,6 +365,7 @@ namespace MyRM
         /// <returns></returns>
         public bool Delete(TP.Transaction context, RID rid)
         {
+            WaitForReady();
             Enlist(context);
 
             _lockManager.LockForWrite(context, rid);
@@ -327,6 +396,7 @@ namespace MyRM
         /// <returns>true the given resources exists. False if not</returns>
         public bool Delete(Transaction context, RID rid, int count)
         {
+            WaitForReady();
             Enlist(context);
 
             _lockManager.LockForWrite(context, rid);
@@ -394,6 +464,7 @@ namespace MyRM
         /// <returns>returns the amount available for the specified item type */</returns>
         public int Query(TP.Transaction context, RID rid)
         {
+            WaitForReady();
             Enlist(context);
 
             _lockManager.LockForRead(context, rid);
@@ -416,6 +487,7 @@ namespace MyRM
         /// <returns>returns the price for the specified item type</returns>
         public int QueryPrice(Transaction context, RID rid)
         {
+            WaitForReady();
             Enlist(context);
 
             _lockManager.LockForRead(context, rid);
@@ -437,6 +509,7 @@ namespace MyRM
         /// <returns>the string of the list of reserved resources for the customer</returns>
         public String QueryReserved(Transaction context, Customer customer)
         {
+            WaitForReady();
             Enlist(context);
 
             _lockManager.LockForRead(context, customer);
@@ -465,6 +538,7 @@ namespace MyRM
         /// <returns>the total price of reserved resources for the customer</returns>
         public int QueryReservedPrice(Transaction context, Customer customer)
         {
+            WaitForReady();
             Enlist(context);
 
             int bill = 0;
@@ -497,6 +571,7 @@ namespace MyRM
         /// <returns>true if reservation is successful</returns>
         public bool Reserve(Transaction context, Customer c, RID i)
         {
+            WaitForReady();
             Enlist(context);
 
             _lockManager.LockForWrite(context, c);
@@ -532,6 +607,7 @@ namespace MyRM
         /// <param name="c"></param>
         public void UnReserve(Transaction context, Customer c)
         {
+            WaitForReady();
             Enlist(context);
 
             _lockManager.LockForWrite(context, c);
@@ -570,6 +646,7 @@ namespace MyRM
         /// <returns></returns>
         public String[] ListResources(Transaction context, RID.Type type)
         {
+            WaitForReady();
             Enlist(context);
 
             List<string> result = new List<string>();
@@ -590,6 +667,7 @@ namespace MyRM
         /// <returns></returns>
         public Customer[] ListCustomers(Transaction context)
         {
+            WaitForReady();
             Enlist(context);
 
             var customers = new List<Customer>(_transactionStorage.GetCustomers(context));
@@ -625,5 +703,8 @@ namespace MyRM
             // TODO deadlock detector, retry timeout
         }
 
+        public void Ping()
+        {
+        }
     }
 }

@@ -175,6 +175,7 @@
             string[] flights = new string[] { "SEA->LAX", "LAX->LAV" };
             WorkflowControl.ReserveItinerary(c, flights, "Vegas", true, true);
             // We shall see some rollback message from TM. 
+            Pause();
             Transaction t = WorkflowControl.Start();
             string actual = WorkflowControl.QueryItinerary(t, c);
             Console.WriteLine(actual);
@@ -222,20 +223,91 @@
             StopProcesses();
         }
 
+        /// <summary>
+        /// TM dies before receive prepare from all RM, on recovery, the transaction abort
+        /// </summary>
+        public void TMFailsBeforeReceivingAllPrepare2PC()
+        {
+            StartUp();
+
+            Transaction t = WorkflowControl.Start();
+            WorkflowControl.AddCars(t, "Seattle", 10, 100);
+            TransactionManager.SelfDestruct(true, false);
+            WorkflowControl.Commit(t);
+
+            // TM shall be kill, now restart it            
+            Pause();
+
+            StartTM();
+            // shall see the transaction aborts
+            t = WorkflowControl.Start();
+            string actual = PrintCars();
+            Assert.AreEqual("Vegas,1,3;NewYork,10,30;", actual);
+            actual = PrintRooms();
+            Assert.AreEqual("Vegas,2,1;NewYork,20,10;", actual);
+            actual = PrintFlights();
+            Assert.AreEqual("SEA->LAX,10,2;LAX->LAV,12,3;SEA->JFK,8,4;", actual);
+            actual = PrintCustomers();
+            Assert.AreEqual("", actual);
+            StopProcesses();
+        }
+        /// <summary>
+        /// TM dies before receiving Done from all RMs, on recovery, TM should recommit
+        /// </summary>
+        public void TMFailsBeforeReceivingAllDone2PC()
+        {
+            StartUp();
+
+            Transaction t = WorkflowControl.Start();
+            TransactionManager.SelfDestruct(false, true);
+            WorkflowControl.AddCars(t, "Seattle", 10, 100);
+            WorkflowControl.Commit(t);
+
+            // TM shall be kill, now restart it
+            Pause();
+            StartTM();
+            // shall see the transaction recommits. 
+            t = WorkflowControl.Start();
+            string actual = PrintCars();
+            Assert.AreEqual("Vegas,1,3;NewYork,10,30;Seattle,10,100;", actual);
+            actual = PrintRooms();
+            Assert.AreEqual("Vegas,2,1;NewYork,20,10;", actual);
+            actual = PrintFlights();
+            Assert.AreEqual("SEA->LAX,10,2;LAX->LAV,12,3;SEA->JFK,8,4;", actual);
+            actual = PrintCustomers();
+            Assert.AreEqual("", actual);
+            StopProcesses();
+        }
+
         public void ExecuteAll()
         {
-            //Console.WriteLine("Submit an itinerary with car, flight and hotel. Show the values are updated. Demo Read, write and commit.");
+            //Console.WriteLine("1. Submit an itinerary with car, flight and hotel. Show the values are updated. Demo Read, write and commit.");
+            //Pause();
             //AddOneItinerary();
-            //Console.WriteLine("Add an itinerary, kill RM before commit. Restart the RMs and you can see nothing changed (still c1 state). Demo shadow copy works after failure");
-            //UncommittedScenario();
-            //Console.WriteLine("Have T1 and T2 read R1, both shall get the result immediately.Have T1, T2 both write R2 concurrently, The result shall be correct. Demo locks and two transaction runs concurrently.");
-            //ConcurrentTransactions();
-            //Console.WriteLine("T1, T2 write R1, T1 commit, T2 abort, see only T1's change in. Demo abort.");
-            //ConcurrentCommitAbort();
-            //Console.WriteLine("All RMs returns prepared, except one fails to prepare, the transaction should abort");
-            //RollbackAfterRmFailTransaction2PC();
-            Console.WriteLine("All RM prepared, one RM dies before receiving Commit, on recovery, the RM should recover the transaction, WC shouldn’t notice this");
+            //Console.WriteLine("2. Add an itinerary, kill RM before commit. Restart the RMs and you can see nothing changed (still c1 state). Demo shadow copy works after failure");
+            //Pause();
+            UncommittedScenario();
+            Console.WriteLine("3. Have T1 and T2 read R1, both shall get the result immediately.Have T1, T2 both write R2 concurrently, The result shall be correct. Demo locks and two transaction runs concurrently.");
+            Pause();
+            ConcurrentTransactions();
+            Console.WriteLine("4. T1, T2 write R1, T1 commit, T2 abort, see only T1's change in. Demo abort.");
+            Pause();
+            ConcurrentCommitAbort();
+            Console.WriteLine("5. All RMs returns prepared, except one fails to prepare, the transaction should abort");
+            Pause();
+            RollbackAfterRmFailTransaction2PC();
+            Console.WriteLine("6. All RM prepared, one RM dies before receiving Commit, on recovery, the RM should recover the transaction, WC shouldn’t notice this");
+            Pause();
             ReCommitAfterRmFailTransaction2PC();
+            Console.WriteLine("7. TM dies before receive prepare from all RM, on recovery, the transaction abort");
+            Pause();
+            TMFailsBeforeReceivingAllPrepare2PC();
+            Console.WriteLine("8. TM dies before receiving Done from all RMs, on recovery, TM should recommit");
+            Pause();
+            TMFailsBeforeReceivingAllDone2PC();
+
+            Console.WriteLine("All demo done");
+            Pause();
             //StartProcesses();
             //Pause();
 
@@ -358,7 +430,7 @@
             this.CarsRM = (RM)System.Activator.GetObject(typeof(RM), "http://localhost:8082/RM.soap");
             this.RoomsRM = (RM)System.Activator.GetObject(typeof(RM), "http://localhost:8083/RM.soap");
             this.FlightsRM = (RM)System.Activator.GetObject(typeof(RM), "http://localhost:8081/RM.soap");
-            //this.TransactionManager = (TM)System.Activator.GetObject(typeof(TM), "http://localhost:8080/TM.soap");
+            this.TransactionManager = (TM)System.Activator.GetObject(typeof(TM), "http://localhost:8089/TM.soap");
             InitInventory();
         }
 
@@ -439,7 +511,13 @@
         {
             foreach (Process p in Process.GetProcessesByName(name))
             {
-                p.Kill();
+                try
+                {
+                    p.Kill();
+                }
+                catch (Exception)
+                {
+                }
             }
         }
     }

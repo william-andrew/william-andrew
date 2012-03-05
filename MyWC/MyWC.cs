@@ -20,6 +20,7 @@ namespace MyWC
         public static TP.RM Rooms { get; set; }
         public static TP.RM Cars { get; set; }
         public static TP.TM TransactionManager { get; set; }
+        static string tmURL;
 
         /// <param name="c">Customer</param>
         /// <param name="flights">array of flight names</param>
@@ -29,6 +30,7 @@ namespace MyWC
         /// <returns>price of reservation</returns>
         public bool ReserveItinerary(TP.Customer c, string[] flights, string location, bool car, bool room)
         {
+            
             TP.Transaction tid = TransactionManager.Start();
 
             try
@@ -224,17 +226,43 @@ namespace MyWC
 
         public Transaction Start()
         {
-            return TransactionManager.Start();
+            try
+            {
+                return TransactionManager.Start();
+            }
+            catch (WebException)
+            {
+                TransactionManager = null;
+                ReconnectToTM();
+            }
+
+            return null;
         }
 
         public void Commit(Transaction context)
         {
-            TransactionManager.Commit(context);
+            try
+            {
+                TransactionManager.Commit(context);
+            }
+            catch (WebException)
+            {
+                TransactionManager = null;
+                ReconnectToTM();
+            }
         }
 
         public void Abort(Transaction context)
         {
-            TransactionManager.Abort(context);
+            try
+            {
+                TransactionManager.Abort(context);
+            }
+            catch (WebException)
+            {
+                TransactionManager = null;
+                ReconnectToTM();
+            }
         }
 
         protected void Init(String[] args)
@@ -257,6 +285,20 @@ namespace MyWC
 
         protected void ReadyToServe()
         {
+        }
+
+        /// <summary>
+        ///   Exit TM (simulate a failure) on certain condition
+        ///   Now supports 
+        ///   1. exit before all RM is prepared (send Prepare to 1 RM then killed)
+        ///   2. exit before all RM are done (send commited to 1 RM then killed)
+        ///   
+        /// </summary>
+        /// <param name="prepareFailed"></param>
+        /// <param name="commitFailed"></param>
+        public void TMSelfDestruct(bool prepareFailed, bool commitFailed)
+        {
+            TransactionManager.SelfDestruct(prepareFailed, commitFailed);
         }
 
         class WCParser : CommandLineParser
@@ -289,7 +331,7 @@ namespace MyWC
             //string rmCarsURL = parser["c"];
             string tmPort = parser["tmp"];
             string tmServer = parser["tms"];
-            string tmURL = tmServer + ":" + tmPort + "/TM.soap";
+            tmURL = tmServer + ":" + tmPort + "/TM.soap";
 
             while (TransactionManager == null)
             {
@@ -336,9 +378,41 @@ namespace MyWC
 
             while (true)
             {
-                System.Threading.Thread.Sleep(100000);
+                System.Threading.Thread.Sleep(1000);
+                try
+                {
+                    TransactionManager.Ping();
+                }
+                catch(WebException)
+                {
+                    TransactionManager = null;
+                    ReconnectToTM();
+                }
             }
         }
 
+        /// <summary>
+        /// try to reconnect to TM after tm failed. 
+        /// </summary>
+        public static void ReconnectToTM()
+        {
+            while (TransactionManager == null)
+            {
+                Console.WriteLine("Trying to reconnect to TM");
+                TransactionManager = (TP.TM)Activator.GetObject(typeof(TP.TM), tmURL);
+                try
+                {
+                    TransactionManager.Ping();
+                }
+                catch (WebException)
+                {
+                    TransactionManager = null;
+                    Console.WriteLine("Waiting 1 second for Transaction Manager \"{0}\"", tmURL);
+                    System.Threading.Thread.Sleep(1000);
+                }
+            }
+
+            Console.WriteLine("Connected to Transaction Manager \"{0}\"", tmURL);
+        }
     }
 }

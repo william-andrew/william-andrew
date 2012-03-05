@@ -24,12 +24,27 @@ namespace MyTM
         private static Dictionary<Transaction, CommitedTransaction> committedTransactions = new Dictionary<Transaction, CommitedTransaction>();
         private static bool isInitialized = false;
         private static object syncRoot = new object();
-        
+
+        public static bool PrepareFail
+        {
+            get;
+            set;
+        }
+
+        public static bool CommitFail
+        {
+            get;
+            set;
+        }
         public static bool IsInitialized
         {
             get { return isInitialized; }
         }
 
+        static TwoPhaseCommit()
+        {
+            Init();
+        }
         /// <summary>
         /// Initialize the class 
         /// If the log file exists, it will try to recover from previous run first by looking for 
@@ -90,8 +105,9 @@ namespace MyTM
         public static CommitedTransaction Commit(Transaction context, ResourceManagerList rms)
         {
             Init();
-            
+
             CommitedTransaction trans = new CommitedTransaction(context, rms);
+            trans.State = CommitState.Committed;
             lock (committedTransactions)
             {
                 if (!committedTransactions.ContainsKey(context))
@@ -104,7 +120,7 @@ namespace MyTM
                 }
             }
 
-            ThreadPool.QueueUserWorkItem(o=>trans.StartCommit());
+            ThreadPool.QueueUserWorkItem(o => trans.StartCommit(PrepareFail, CommitFail));
             return trans;
         }
 
@@ -135,11 +151,7 @@ namespace MyTM
             }
         }
 
-        public static void Abort(Transaction context)
-        {
-            Init();
-        }
-
+        
         /// <summary>
         /// Flush all committedTransactions to disk
         /// </summary>

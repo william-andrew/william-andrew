@@ -66,6 +66,7 @@ namespace TestProject
             CommitedTransaction_Accessor.expBackoff = 1;
             CommitedTransaction_Accessor target = new CommitedTransaction_Accessor(context, rms);
             CommitedTransaction_Accessor.stepTimeout = 10;
+            target.State = CommitState.Committed;
             target.StartCommit();
             Assert.AreEqual(string.Format("2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 1\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 2\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 3\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\r2PC:Retry Commit {0}\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 1\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 2\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\rSleep and retry 3\r2PC:Commit {0}:MockRM\r2PC:Commit {0}:test\r", context.Id), target.Message);
         }
@@ -83,7 +84,8 @@ namespace TestProject
             rms.Add(MyRMTest.MockRM());
             CommitedTransaction_Accessor.expBackoff = 1;
             CommitedTransaction_Accessor target = new CommitedTransaction_Accessor(context, rms);
-            CommitedTransaction_Accessor.stepTimeout = 10;
+            CommitedTransaction_Accessor.stepTimeout = 100;
+            target.State = CommitState.Committed;
             target.StartCommit();
             Assert.AreEqual(string.Format("2PC:Prepare {0}:MockRM\r2PC:Prepare {0}:test\r2PC:Rollback {0}:MockRM\r2PC:Rollback {0}:test\r", context.Id), target.Message);
         }

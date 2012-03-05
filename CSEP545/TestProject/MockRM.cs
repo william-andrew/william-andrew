@@ -28,6 +28,8 @@ namespace TestProject
            
         }
 
+        public void Ping() { }
+
         public TP.XaResponse Commit(TP.Transaction context)
         {
             return this.CommitResponse;

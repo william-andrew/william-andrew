@@ -198,7 +198,10 @@ namespace TP
 
 
         RM GetResourceMananger(string name);
-        
+
+        // use to make sure TM is alive
+        void Ping();
+
 		/// <param name="context"></param>
 		void Abort(Transaction context);
 		
@@ -214,6 +217,17 @@ namespace TP
 		/// </summary>
 		/// <param name="rm"></param>
         void Register(string rm);
+
+        /// <summary>
+        ///   Exit (simulate a failure) on certain condition
+        ///   Now supports 
+        ///   1. exit before all RM is prepared (send Prepare to 1 RM then killed)
+        ///   2. exit before all RM are done (send commited to 1 RM then killed)
+        ///   
+        /// </summary>
+        /// <param name="prepareFailed"></param>
+        /// <param name="commitFailed"></param>
+        void SelfDestruct(bool prepareFailed, bool commitFailed);
     }
 
 	/// <summary>
@@ -260,16 +274,22 @@ namespace TP
         string QueryItinerary(Transaction context, Customer customer);
         int QueryItineraryPrice(Transaction context, Customer customer);
 
+        /// <summary>
+        ///   Exit TM (simulate a failure) on certain condition
+        ///   Now supports 
+        ///   1. exit before all RM is prepared (send Prepare to 1 RM then killed)
+        ///   2. exit before all RM are done (send commited to 1 RM then killed)
+        ///   
+        /// </summary>
+        /// <param name="prepareFailed"></param>
+        /// <param name="commitFailed"></param>
+        void TMSelfDestruct(bool prepareFailed, bool commitFailed);
 	}
 
     public enum XaResponse
     {
         XA_OK,
-        XAER_PROTO,  // something wrong with protocol
-        XA_RBROLLBACK, //The resource manager rolled back the transaction branch for an unspecified reason.
-        XA_RBCOMMFAIL, //A communication failure occurred within the resource manager
         XAER_RMERR, // something wrong
-        XA_RETRY, // need to retry 
     }
 	/// <summary>
 	/*   Resource Manager Interface */
@@ -284,7 +304,10 @@ namespace TP
 
         void SetName(string name);
 
-		/// <param name="context"></param>
+        // use to make sure RM is alive
+        void Ping();
+
+        /// <param name="context"></param>
  		void Enlist(Transaction context);
 
 		/// <param name="context"></param>

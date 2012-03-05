@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using TP;
 using System.Net;
+using System.Diagnostics;
 
 namespace MyTM
 {
@@ -14,6 +15,8 @@ namespace MyTM
         private static int stepTimeout = 2000; // millisecond
         private List<CommitState> rmCommitStates;
         private AutoResetEvent stepWaitEvent = new AutoResetEvent(false);
+        private bool prepareFail; // exit before all RM is prepared (send Prepare to 1 RM then killed)
+        private bool commitFail; //exit before all RM are done (send commited to 1 RM then killed)
         public string Message = string.Empty;
         public CommitedTransaction(Transaction context, ResourceManagerList rms)
         {
@@ -89,7 +92,7 @@ namespace MyTM
         /// </summary>
         /// <param name="index"></param>
         /// <param name="state"></param>
-        public void SetState(int index, CommitState state)
+        private void SetState(int index, CommitState state)
         {
             CommitState result = CommitState.Rollbacked;
             lock (rmCommitStates)
@@ -119,9 +122,18 @@ namespace MyTM
         /// This method shall be hosted in a new thread. 
         /// The caller can wait on the DoneEvent. 
         /// </summary>
-        public void StartCommit()
+        public void StartCommit(bool prepareFail = false, bool commitFail = false)
         {
+            this.prepareFail = prepareFail;
+            this.commitFail = commitFail;
             bool isStepComplete = false;
+            var list = this.ResouceManagers.ResourceManagers;
+            for (int i = 0; i < list.Count; i++)
+            {
+                rmCommitStates[i] = CommitState.Committed;
+            }
+
+            TwoPhaseCommit.WriteLog();
             Prepare();
 
             if ((isStepComplete = this.stepWaitEvent.WaitOne(stepTimeout)))
@@ -182,7 +194,12 @@ namespace MyTM
 
             return this.stepWaitEvent.WaitOne(stepTimeout);
         }
-        
+
+        private void SelfDestroying()
+        {
+            Process.GetCurrentProcess().Kill();
+        }
+
         private void Prepare()
         {
             var list = this.ResouceManagers.ResourceManagers;
@@ -190,7 +207,7 @@ namespace MyTM
             {
                 RM r = list[i];
                 int temp = i;
-                string outstring = string.Format("2PC:Prepare {0}:{1}\r", this.Context.Id, r.GetName());
+                string outstring = string.Format("2PC:Prepare {0}:{1}\r", this.Context.Id, this.ResouceManagers.RMNames[temp]);
                 this.Message += outstring;
                 Console.Write(outstring);
                 ThreadPool.QueueUserWorkItem(o =>
@@ -206,8 +223,12 @@ namespace MyTM
                     catch (WebException)
                     {
                     }
-
                 });
+
+                if (prepareFail)
+                {
+                    SelfDestroying();
+                }
             }
         }
 
@@ -217,12 +238,13 @@ namespace MyTM
             for (int i = 0; i < list.Count; i++)
             {
                 RM r = list[i];
-                string outstring = string.Format("2PC:Commit {0}:{1}\r", this.Context.Id, r.GetName());
+                int temp = i;
+                string outstring = string.Format("2PC:Commit {0}:{1}\r", this.Context.Id, this.ResouceManagers.RMNames[temp]);
                 this.Message += outstring;
                 Console.Write(outstring);
-                int temp = i;
                 ThreadPool.QueueUserWorkItem(o =>
                 {
+
                     try
                     {
                         XaResponse response = r.Commit(this.Context);
@@ -234,8 +256,12 @@ namespace MyTM
                     catch (WebException)
                     {
                     }
-
                 });
+
+                if (commitFail)
+                {
+                    SelfDestroying();
+                }
             }
         }
 
@@ -251,6 +277,7 @@ namespace MyTM
                 int temp = i;
                 ThreadPool.QueueUserWorkItem(o =>
                 {
+
                     try
                     {
                         r.Abort(this.Context);

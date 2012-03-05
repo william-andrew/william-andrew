@@ -29,7 +29,9 @@ namespace MyTM
         {
             Console.WriteLine("TM: Transaction Manager instantiated");
             _resourceManagers = new Dictionary<string, RM>();
-
+            // by default, the TwoPhaseCommit shall not have the debugging properties PrepareFail and CommitFail set
+            TwoPhaseCommit.PrepareFail = false;
+            TwoPhaseCommit.CommitFail = false;
             _transactionScavengerThread = new Thread(TransactionScavenger) { Name = "TransactionScavengerThread" };
             _transactionScavengerThread.Start();
         }
@@ -84,7 +86,7 @@ namespace MyTM
         public RM GetResourceMananger(string name)
         {
             lock (_resourceManagers)
-            {
+            {                
                 foreach (RM rm in _resourceManagers.Values)
                 {
                     if (String.Compare(rm.GetName(), name, StringComparison.OrdinalIgnoreCase) == 0)
@@ -99,6 +101,10 @@ namespace MyTM
             var context = new Transaction();
             Console.WriteLine(string.Format("TM: Transaction {0} started", context.Id));
             return context;
+        }
+
+        public void Ping()
+        {
         }
 
         /// <summary>
@@ -195,8 +201,7 @@ namespace MyTM
             }
             lock (_resourceManagers)
             {
-                if (!_resourceManagers.ContainsKey(newRM.GetName()))
-                    _resourceManagers.Add(newRM.GetName(), newRM);
+                _resourceManagers[newRM.GetName()] = newRM;
             }
         }
 
@@ -264,5 +269,23 @@ namespace MyTM
                 TwoPhaseCommit.PrintMessage();
             }
         }
+
+        #region TM Members
+
+        /// <summary>
+        ///   Exit (simulate a failure) on certain condition
+        ///   Now supports 
+        ///   1. exit before all RM is prepared (send Prepare to 1 RM then killed)
+        ///   2. exit before all RM are done (send commited to 1 RM then killed)
+        /// </summary>
+        /// <param name="prepareFailed"></param>
+        /// <param name="commitFailed"></param>
+        public void SelfDestruct(bool prepareFailed, bool commitFailed)
+        {
+            TwoPhaseCommit.CommitFail = commitFailed;
+            TwoPhaseCommit.PrepareFail = prepareFailed;
+        }
+
+        #endregion
     }
 }
