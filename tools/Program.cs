@@ -17,7 +17,7 @@ namespace Tools
                 Row row = null;
                 try
                 {
-                    row = db.ReadRecord(null, args[1], r.Key);
+                    row = db.ReadRecord(null, args[1], Trim(r.Key));
                 }
                 catch (RecordNotFoundException)
                 {
@@ -27,5 +27,11 @@ namespace Tools
             }
             System.Console.WriteLine("Total rows {0}", pageTable.RecordIndices.Length);
         }
+
+        private static string Trim(string key)
+        {
+            return key.TrimEnd('\0');
+        }
+
     }
 }
