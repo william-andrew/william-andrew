@@ -14,7 +14,7 @@ namespace MyRM.Storage
         public const int DefaultPageSize = 4096;
         public const int PageHeaderSize = 10; // {P$}{Page Index}{NextFreeRowIndex}
 
-        private const int DefaultTotalPages = 16;
+        private const int DefaultTotalPages = 16; //Two pages at minimum are required to provide enough row space for the page table 
         private const int DataFileHeaderSize = 256;
 
         private readonly string _databaseName;
