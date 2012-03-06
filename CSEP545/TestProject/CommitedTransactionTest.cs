@@ -16,7 +16,7 @@ namespace TestProject
         [TestCleanup]
         public void Cleanup()
         {
-            CommonFunction.CleanUp2pcLog();
+            CommonFunction.CleanUpAll();
         }
 
         /// <summary>

@@ -12,6 +12,12 @@ namespace TestProject
     [TestClass()]
     public class MyLMTest
     {
+        [TestCleanup]
+        public void Cleanup()
+        {
+            CommonFunction.CleanUpAll();
+        }
+
         /// <summary>
         ///A test for LockForRead
         ///</summary>

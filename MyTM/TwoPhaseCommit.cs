@@ -43,14 +43,14 @@ namespace MyTM
 
         static TwoPhaseCommit()
         {
-            Init();
+            StartUp();
         }
         /// <summary>
         /// Initialize the class 
         /// If the log file exists, it will try to recover from previous run first by looking for 
         /// committed transactions which are in CommitState.Committed || CommitState.Prepared state.
         /// </summary>
-        public static void Init()
+        public static void StartUp()
         {
             lock (syncRoot)
             {
@@ -104,10 +104,9 @@ namespace MyTM
         /// <returns></returns>
         public static CommitedTransaction Commit(Transaction context, ResourceManagerList rms)
         {
-            Init();
+            StartUp();
 
             CommitedTransaction trans = new CommitedTransaction(context, rms);
-            trans.State = CommitState.Committed;
             lock (committedTransactions)
             {
                 if (!committedTransactions.ContainsKey(context))
@@ -120,7 +119,17 @@ namespace MyTM
                 }
             }
 
-            ThreadPool.QueueUserWorkItem(o => trans.StartCommit(PrepareFail, CommitFail));
+            ThreadPool.QueueUserWorkItem(o =>
+                {
+                    lock (trans)
+                    {
+                        if (trans.State < CommitState.Committed)
+                        {
+                            trans.State = CommitState.Committed;
+                            trans.StartCommit(PrepareFail, CommitFail);
+                        }
+                    }
+                });
             return trans;
         }
 
@@ -170,6 +179,12 @@ namespace MyTM
                     writer.Write(fileContent);
                 }
             }
+        }
+
+        private static void Cleanup()
+        {
+            isInitialized = false;
+            committedTransactions = new Dictionary<Transaction, CommitedTransaction>();
         }
     }
 }

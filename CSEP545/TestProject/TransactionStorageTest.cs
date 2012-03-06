@@ -10,7 +10,7 @@ namespace TestProject
     [TestClass]
     public class TransactionStorageTest
     {
-        [TestInitialize]
+        [TestCleanup]
         public void Cleanup()
         {
             CommonFunction.CleanUpAll();

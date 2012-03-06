@@ -118,9 +118,9 @@ namespace MyRM
 
         private void WaitForReady()
         {
-            while (!isReady)
+            while (!isReady || _transactionManager == null)
             {
-                Thread.Sleep(1000);
+                Thread.Sleep(500);
             }
         }
 
@@ -231,28 +231,30 @@ namespace MyRM
         /// </summary>
         public static void ReconnectToTM()
         {
-            while (_transactionManager == null)
+            TM tempTM = null;
+            while (tempTM == null)
             {
                 Console.WriteLine("Trying to reconnect to TM");
-                _transactionManager = (TP.TM)System.Activator.GetObject(typeof(TP.TM), tmUrl);
+                tempTM = (TP.TM)System.Activator.GetObject(typeof(TP.TM), tmUrl);
 
                 try
                 {
-                    _transactionManager.Ping();
+                    tempTM.Ping();
                     foreach (string url in urls)
                     {
-                        _transactionManager.Register(url + "$" + GlobalState.Name);
+                        tempTM.Register(url + "$" + GlobalState.Name);
 
                     }
                 }
                 catch (WebException)
                 {
-                    _transactionManager = null;
-                    Console.WriteLine("Waiting 1 second for Transaction Manager \"{0}\"", tmUrl);
-                    System.Threading.Thread.Sleep(1000);
+                    tempTM = null;
+                    Console.WriteLine("Waiting 0.5 second for Transaction Manager \"{0}\"", tmUrl);
+                    System.Threading.Thread.Sleep(500);
                 }
 
             }
+            Interlocked.Exchange<TM>(ref _transactionManager, tempTM); 
             Console.WriteLine("Connected to Transaction Manager \"{0}\"", tmUrl);
         }
 
@@ -266,14 +268,18 @@ namespace MyRM
             WaitForReady();
             try
             {
-                //_transactionManager = (TP.TM)System.Activator.GetObject(typeof(TP.TM), tmUrl);
                 _transactionManager.Enlist(context, this.GetName());
+                return;
             }
             catch (WebException)
             {
-                _transactionManager = null;
-                ReconnectToTM();
             }
+            catch(ApplicationException)
+            {
+            }
+            _transactionManager = null;
+            ReconnectToTM();
+            WaitForReady();
         }
 
         /// <summary>

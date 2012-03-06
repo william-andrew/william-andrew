@@ -177,6 +177,11 @@ namespace MyTM
         /// <return>false if the recover process failed.</return>
         public bool Recover()
         {
+            foreach (RM rm in this.ResouceManagers.ResourceManagers)
+            {
+                rm.Enlist(this.Context);
+            }
+
             switch (State)
             {
                 case CommitState.Committed:
@@ -212,16 +217,22 @@ namespace MyTM
                 Console.Write(outstring);
                 ThreadPool.QueueUserWorkItem(o =>
                 {
-                    try
+                    while (true)
                     {
-                        XaResponse response = r.Prepare(this.Context);
-                        if (response == XaResponse.XA_OK)
+                        try
                         {
-                            this.SetState(temp, CommitState.Prepared);
+                            XaResponse response = r.Prepare(this.Context);
+                            if (response == XaResponse.XA_OK)
+                            {
+                                this.SetState(temp, CommitState.Prepared);
+                            }
+                            break;
                         }
-                    }
-                    catch (WebException)
-                    {
+                        catch (WebException)
+                        {
+                        }
+                        Console.WriteLine("ResourceManager {0} is not ready, wait 0.5 second", this.ResouceManagers.RMNames[temp]);
+                        Thread.Sleep(500);
                     }
                 });
 
@@ -245,16 +256,22 @@ namespace MyTM
                 ThreadPool.QueueUserWorkItem(o =>
                 {
 
-                    try
+                    while (true)
                     {
-                        XaResponse response = r.Commit(this.Context);
-                        if (response == XaResponse.XA_OK)
+                        try
                         {
-                            this.SetState(temp, CommitState.Done);
+                            XaResponse response = r.Commit(this.Context);
+                            if (response == XaResponse.XA_OK)
+                            {
+                                this.SetState(temp, CommitState.Done);
+                            }
+                            break;
                         }
-                    }
-                    catch (WebException)
-                    {
+                        catch (WebException)
+                        {
+                        }
+                        Console.WriteLine("ResourceManager {0} is not ready, wait 0.5 second", this.ResouceManagers.RMNames[temp]);
+                        Thread.Sleep(500);
                     }
                 });
 
@@ -277,13 +294,18 @@ namespace MyTM
                 int temp = i;
                 ThreadPool.QueueUserWorkItem(o =>
                 {
-
-                    try
+                    while (true)
                     {
-                        r.Abort(this.Context);
-                    }
-                    catch (WebException)
-                    {
+                        try
+                        {
+                            r.Abort(this.Context);
+                            break;
+                        }
+                        catch (WebException)
+                        {
+                        }
+                        Console.WriteLine("ResourceManager {0} is not ready, wait 0.5 second", this.ResouceManagers.RMNames[temp]);
+                        Thread.Sleep(500);
                     }
                     // presume abort, if we don't check return of the abort 
                     // Once the abort message is sent, it is consider done.

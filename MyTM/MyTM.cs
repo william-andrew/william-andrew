@@ -8,6 +8,7 @@ using System.Runtime.Serialization.Formatters;
 using System.Threading;
 using TP;
 
+
 namespace MyTM
 {
     /// <summary>
@@ -32,8 +33,20 @@ namespace MyTM
             // by default, the TwoPhaseCommit shall not have the debugging properties PrepareFail and CommitFail set
             TwoPhaseCommit.PrepareFail = false;
             TwoPhaseCommit.CommitFail = false;
+            TwoPhaseCommit.StartUp();
             _transactionScavengerThread = new Thread(TransactionScavenger) { Name = "TransactionScavengerThread" };
             _transactionScavengerThread.Start();
+        }
+
+        /// <summary>
+        /// Wait until tm is ready to serve
+        /// </summary>
+        public void WaitTillReady()
+        {
+            while (!TwoPhaseCommit.IsInitialized)
+            {
+                Thread.Sleep(1000);
+            }
         }
 
         // Scan transactions and abort them if times out
@@ -85,6 +98,7 @@ namespace MyTM
 
         public RM GetResourceMananger(string name)
         {
+            WaitTillReady();
             lock (_resourceManagers)
             {                
                 foreach (RM rm in _resourceManagers.Values)
@@ -98,6 +112,7 @@ namespace MyTM
 
         public TP.Transaction Start()
         {
+            WaitTillReady();
             var context = new Transaction();
             Console.WriteLine(string.Format("TM: Transaction {0} started", context.Id));
             return context;
@@ -113,6 +128,7 @@ namespace MyTM
         /// <param name="context"></param>
         public void Commit(TP.Transaction context)
         {
+            WaitTillReady();
             lock (_resourceManagersEnlistedInTransactions)
             {
                 if (_resourceManagersEnlistedInTransactions.ContainsKey(context))
@@ -131,6 +147,7 @@ namespace MyTM
         /// <param name="context"></param>
         public void Abort(TP.Transaction context)
         {
+            WaitTillReady();
             lock (_resourceManagersEnlistedInTransactions)
             {
                 if (_resourceManagersEnlistedInTransactions.ContainsKey(context))
@@ -158,6 +175,7 @@ namespace MyTM
         /// <param name="enlistingRM"> </param>
         public bool Enlist(TP.Transaction context, string enlistingRM)
         {
+            WaitTillReady();
             var rm = GetResourceMananger(enlistingRM);
             if (rm == null)
             {
@@ -188,6 +206,7 @@ namespace MyTM
 
         public void Register(string msg)
         {
+            WaitTillReady();
             string[] URL = msg.Split('$');
             Console.WriteLine("Register " + URL[0]);
             TP.RM newRM = (TP.RM)Activator.GetObject(typeof(TP.RM), URL[0]);
@@ -208,6 +227,7 @@ namespace MyTM
         //TODO: REFACTOR THIS FOR TESTING
         public void Register(TP.RM rm)
         {
+            WaitTillReady();
             _resourceManagers.Add(rm.GetName(), rm);
             
         }

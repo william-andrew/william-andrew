@@ -11,11 +11,12 @@ namespace TestProject
     [TestClass()]
     public class MyWCTest
     {
-        [TestInitialize]
+        [TestCleanup]
         public void CleanPreviousData()
         {
             CommonFunction.CleanUpAll();
         }
+
         /// <summary>
         ///A test for AddSeats
         ///</summary>

@@ -9,24 +9,29 @@ namespace TestProject
 {
     public static class CommonFunction
     {
-        public static void CleanUp2pcLog()
+        public static void CleanUp2pc()
         {
             File.Delete(TwoPhaseCommit.LogFileName);
-            TwoPhaseCommit_Accessor.isInitialized = false;
+            TwoPhaseCommit_Accessor.Cleanup();
         }
 
         public static void CleanUpDbFiles()
         {
-            string[] files = Directory.GetFiles(Environment.CurrentDirectory, "MYRM_*");
-            foreach (string file in files)
-            {
-                File.Delete(file);
-            } 
-            files = Directory.GetFiles(Environment.CurrentDirectory, "file*");
+            string[] files = Directory.GetFiles(Environment.CurrentDirectory, "*.data.0");
             foreach (string file in files)
             {
                 File.Delete(file);
             }
+            files = Directory.GetFiles(Environment.CurrentDirectory, "*.data.1");
+            foreach (string file in files)
+            {
+                File.Delete(file);
+            }
+            files = Directory.GetFiles(Environment.CurrentDirectory, "*.index");
+            foreach (string file in files)
+            {
+                File.Delete(file);
+            } 
             files = Directory.GetFiles(Environment.CurrentDirectory, "*.manifest");
             foreach (string file in files)
             {
@@ -36,7 +41,7 @@ namespace TestProject
 
         public static void CleanUpAll()
         {
-            CommonFunction.CleanUp2pcLog();
+            CommonFunction.CleanUp2pc();
             CommonFunction.CleanUpDbFiles();
         }
     }

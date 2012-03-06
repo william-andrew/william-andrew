@@ -12,7 +12,7 @@ namespace TestProject
     {
         readonly UTF8Encoding _encoder = new UTF8Encoding();
 
-        [TestInitialize]
+        [TestCleanup]
         public void Cleanup()
         {
             CommonFunction.CleanUpAll();

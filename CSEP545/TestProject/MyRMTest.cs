@@ -14,13 +14,17 @@ namespace TestProject
     public class MyRMTest
     {
         [TestInitialize]
-        public void Cleanup()
+        public void Init()
         {
             MyRM.MyRM rm = new MyRM.MyRM();
             rm.SetName("test");
-            CommonFunction.CleanUpAll();
         }
 
+        [TestCleanup]
+        public void Cleanup()
+        {
+            CommonFunction.CleanUpAll();
+        }
         /// <summary>
         ///A test for Add
         ///</summary>

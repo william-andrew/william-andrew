@@ -62,7 +62,6 @@
             Assert.AreEqual("SEA->LAX,9,2;LAX->LAV,11,3;SEA->JFK,8,4;", actual);
             actual = PrintCustomers();
             Assert.AreEqual("12345678-1234-1234-1234-123456789012;", actual);
-            StopProcesses();
         }
 
         /// <summary>
@@ -97,7 +96,6 @@
             Assert.AreEqual("SEA->LAX,10,2;LAX->LAV,12,3;SEA->JFK,8,4;", actual);
             actual = PrintCustomers();
             Assert.AreEqual("", actual);
-            StopProcesses();
         }
 
         /// <summary>
@@ -130,7 +128,6 @@
             
             string actual = PrintCars();
             Assert.AreEqual("Vegas,1,3;NewYork,10,30;Seattle,3,3;", actual);            
-            StopProcesses();
         }
 
         /// <summary>
@@ -161,7 +158,6 @@
 
             string actual = PrintCars();
             Assert.AreEqual("Vegas,1,3;NewYork,10,30;Seattle,1,3;", actual);
-            StopProcesses();
         }
 
         /// <summary>
@@ -188,7 +184,6 @@
             Assert.AreEqual("SEA->LAX,10,2;LAX->LAV,12,3;SEA->JFK,8,4;", actual);
             actual = PrintCustomers();
             Assert.AreEqual("", actual);
-            StopProcesses();
         }
 
         /// <summary>
@@ -220,7 +215,6 @@
             Assert.AreEqual("SEA->LAX,9,2;LAX->LAV,11,3;SEA->JFK,8,4;", actual);
             actual = PrintCustomers();
             Assert.AreEqual("12345678-1234-1234-1234-123456789012;", actual);
-            StopProcesses();
         }
 
         /// <summary>
@@ -233,7 +227,7 @@
             Transaction t = WorkflowControl.Start();
             WorkflowControl.AddCars(t, "Seattle", 10, 100);
             TransactionManager.SelfDestruct(true, false);
-            WorkflowControl.Commit(t);
+            ThreadPool.QueueUserWorkItem(o => WorkflowControl.Commit(t));
 
             // TM shall be kill, now restart it            
             Pause();
@@ -249,7 +243,6 @@
             Assert.AreEqual("SEA->LAX,10,2;LAX->LAV,12,3;SEA->JFK,8,4;", actual);
             actual = PrintCustomers();
             Assert.AreEqual("", actual);
-            StopProcesses();
         }
         /// <summary>
         /// TM dies before receiving Done from all RMs, on recovery, TM should recommit
@@ -261,7 +254,7 @@
             Transaction t = WorkflowControl.Start();
             TransactionManager.SelfDestruct(false, true);
             WorkflowControl.AddCars(t, "Seattle", 10, 100);
-            WorkflowControl.Commit(t);
+            ThreadPool.QueueUserWorkItem(o => WorkflowControl.Commit(t));
 
             // TM shall be kill, now restart it
             Pause();
@@ -276,7 +269,6 @@
             Assert.AreEqual("SEA->LAX,10,2;LAX->LAV,12,3;SEA->JFK,8,4;", actual);
             actual = PrintCustomers();
             Assert.AreEqual("", actual);
-            StopProcesses();
         }
 
         public void ExecuteAll()
@@ -286,28 +278,29 @@
             //AddOneItinerary();
             //Console.WriteLine("2. Add an itinerary, kill RM before commit. Restart the RMs and you can see nothing changed (still c1 state). Demo shadow copy works after failure");
             //Pause();
-            UncommittedScenario();
-            Console.WriteLine("3. Have T1 and T2 read R1, both shall get the result immediately.Have T1, T2 both write R2 concurrently, The result shall be correct. Demo locks and two transaction runs concurrently.");
-            Pause();
-            ConcurrentTransactions();
-            Console.WriteLine("4. T1, T2 write R1, T1 commit, T2 abort, see only T1's change in. Demo abort.");
-            Pause();
-            ConcurrentCommitAbort();
-            Console.WriteLine("5. All RMs returns prepared, except one fails to prepare, the transaction should abort");
-            Pause();
-            RollbackAfterRmFailTransaction2PC();
-            Console.WriteLine("6. All RM prepared, one RM dies before receiving Commit, on recovery, the RM should recover the transaction, WC shouldn’t notice this");
-            Pause();
-            ReCommitAfterRmFailTransaction2PC();
-            Console.WriteLine("7. TM dies before receive prepare from all RM, on recovery, the transaction abort");
-            Pause();
-            TMFailsBeforeReceivingAllPrepare2PC();
+            //UncommittedScenario();
+            //Console.WriteLine("3. Have T1 and T2 read R1, both shall get the result immediately.Have T1, T2 both write R2 concurrently, The result shall be correct. Demo locks and two transaction runs concurrently.");
+            //Pause();
+            //ConcurrentTransactions();
+            //Console.WriteLine("4. T1, T2 write R1, T1 commit, T2 abort, see only T1's change in. Demo abort.");
+            //Pause();
+            //ConcurrentCommitAbort();
+            //Console.WriteLine("5. All RMs returns prepared, except one fails to prepare, the transaction should abort");
+            //Pause();
+            //RollbackAfterRmFailTransaction2PC();
+            //Console.WriteLine("6. All RM prepared, one RM dies before receiving Commit, on recovery, the RM should recover the transaction, WC shouldn’t notice this");
+            //Pause();
+            //ReCommitAfterRmFailTransaction2PC();
+            //Console.WriteLine("7. TM dies before receive prepare from all RM, on recovery, the transaction abort");
+            //Pause();
+            //TMFailsBeforeReceivingAllPrepare2PC();
             Console.WriteLine("8. TM dies before receiving Done from all RMs, on recovery, TM should recommit");
             Pause();
             TMFailsBeforeReceivingAllDone2PC();
 
             Console.WriteLine("All demo done");
             Pause();
+            StopProcesses();
             //StartProcesses();
             //Pause();
 
