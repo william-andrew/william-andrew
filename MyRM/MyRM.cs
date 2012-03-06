@@ -22,7 +22,7 @@ namespace MyRM
         static TM _transactionManager;
         static string tmUrl = string.Empty;
         static string[] urls;
-        private static bool isReady = false;
+        private static bool isReady = true;
         public int VoteNoOnPrepare
         {
             get;
@@ -142,6 +142,7 @@ namespace MyRM
 
         static void Main(string[] args)
         {
+            isReady = false; // set isReady false because we want to make sure the actual code is not executed before the rm is going into the stable loop waiting.
             RMParser parser = new RMParser();
 
             if (!parser.Parse(args))

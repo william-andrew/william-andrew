@@ -13,11 +13,12 @@ namespace TestProject
     [TestClass]
     public class MyRMTest
     {
-        [TestCleanup]
+        [TestInitialize]
         public void Cleanup()
         {
             MyRM.MyRM rm = new MyRM.MyRM();
             rm.SetName("test");
+            CommonFunction.CleanUpAll();
         }
 
         /// <summary>
@@ -133,9 +134,10 @@ namespace TestProject
 
         public static MyRM.MyRM_Accessor MockRM()
         {
+
             var db = new SimpleDatabase("file", true);
-            db.CreateTable(Constants.ReservationTableName, 36);
-            db.CreateTable(Constants.ResourcesTableName, 36);
+            db.CreateTable(Constants.ReservationTableName, 96, 36);
+            db.CreateTable(Constants.ResourcesTableName, 96, 36);
             var tm = new MyTM.MyTM();
             var rm = new MyRM_Accessor
                 {

@@ -10,6 +10,12 @@ namespace TestProject
     [TestClass]
     public class TransactionStorageTest
     {
+        [TestInitialize]
+        public void Cleanup()
+        {
+            CommonFunction.CleanUpAll();
+        }
+
         [TestMethod]
         public void SetReservationsTest()
         {

@@ -54,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CommitedTransactionTest.cs" />
+    <Compile Include="CommonFunction.cs" />
     <Compile Include="SimpleDatabaseTest.cs" />
     <Compile Include="MockRM.cs" />
     <Compile Include="MyLMTest.cs" />
@@ -86,6 +87,9 @@
   </ItemGroup>
   <ItemGroup>
     <Shadow Include="Test References\MyTM.accessor" />
+  </ItemGroup>
+  <ItemGroup>
+    <Shadow Include="Test References\MyWC.accessor" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

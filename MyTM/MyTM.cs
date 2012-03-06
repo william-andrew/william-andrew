@@ -209,6 +209,7 @@ namespace MyTM
         public void Register(TP.RM rm)
         {
             _resourceManagers.Add(rm.GetName(), rm);
+            
         }
 
         public void shutdown()

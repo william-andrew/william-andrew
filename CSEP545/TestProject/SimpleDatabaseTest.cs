@@ -12,6 +12,12 @@ namespace TestProject
     {
         readonly UTF8Encoding _encoder = new UTF8Encoding();
 
+        [TestInitialize]
+        public void Cleanup()
+        {
+            CommonFunction.CleanUpAll();
+        }
+
         [TestMethod]
         public void RowTest()
         {

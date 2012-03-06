@@ -17,9 +17,9 @@ namespace TestProject
         [TestCleanup]
         public void Cleanup()
         {
-            File.Delete(TwoPhaseCommit_Accessor.LogFileName);
-            TwoPhaseCommit_Accessor.isInitialized = false;
+            CommonFunction.CleanUp2pcLog();
         }
+
         /// <summary>
         ///A test for Commit
         ///</summary>
