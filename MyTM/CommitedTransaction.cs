@@ -177,10 +177,10 @@ namespace MyTM
         /// <return>false if the recover process failed.</return>
         public bool Recover()
         {
-            foreach (RM rm in this.ResouceManagers.ResourceManagers)
-            {
-                rm.Enlist(this.Context);
-            }
+            //foreach (RM rm in this.ResouceManagers.ResourceManagers)
+            //{
+            //    rm.Enlist(this.Context);
+            //}
 
             switch (State)
             {

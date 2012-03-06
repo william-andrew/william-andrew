@@ -273,27 +273,27 @@
 
         public void ExecuteAll()
         {
-            //Console.WriteLine("1. Submit an itinerary with car, flight and hotel. Show the values are updated. Demo Read, write and commit.");
-            //Pause();
-            //AddOneItinerary();
-            //Console.WriteLine("2. Add an itinerary, kill RM before commit. Restart the RMs and you can see nothing changed (still c1 state). Demo shadow copy works after failure");
-            //Pause();
-            //UncommittedScenario();
-            //Console.WriteLine("3. Have T1 and T2 read R1, both shall get the result immediately.Have T1, T2 both write R2 concurrently, The result shall be correct. Demo locks and two transaction runs concurrently.");
-            //Pause();
-            //ConcurrentTransactions();
-            //Console.WriteLine("4. T1, T2 write R1, T1 commit, T2 abort, see only T1's change in. Demo abort.");
-            //Pause();
-            //ConcurrentCommitAbort();
-            //Console.WriteLine("5. All RMs returns prepared, except one fails to prepare, the transaction should abort");
-            //Pause();
-            //RollbackAfterRmFailTransaction2PC();
-            //Console.WriteLine("6. All RM prepared, one RM dies before receiving Commit, on recovery, the RM should recover the transaction, WC shouldn’t notice this");
-            //Pause();
-            //ReCommitAfterRmFailTransaction2PC();
-            //Console.WriteLine("7. TM dies before receive prepare from all RM, on recovery, the transaction abort");
-            //Pause();
-            //TMFailsBeforeReceivingAllPrepare2PC();
+            Console.WriteLine("1. Submit an itinerary with car, flight and hotel. Show the values are updated. Demo Read, write and commit.");
+            Pause();
+            AddOneItinerary();
+            Console.WriteLine("2. Add an itinerary, kill RM before commit. Restart the RMs and you can see nothing changed (still c1 state). Demo shadow copy works after failure");
+            Pause();
+            UncommittedScenario();
+            Console.WriteLine("3. Have T1 and T2 read R1, both shall get the result immediately.Have T1, T2 both write R2 concurrently, The result shall be correct. Demo locks and two transaction runs concurrently.");
+            Pause();
+            ConcurrentTransactions();
+            Console.WriteLine("4. T1, T2 write R1, T1 commit, T2 abort, see only T1's change in. Demo abort.");
+            Pause();
+            ConcurrentCommitAbort();
+            Console.WriteLine("5. All RMs returns prepared, except one fails to prepare, the transaction should abort");
+            Pause();
+            RollbackAfterRmFailTransaction2PC();
+            Console.WriteLine("6. All RM prepared, one RM dies before receiving Commit, on recovery, the RM should recover the transaction, WC shouldn’t notice this");
+            Pause();
+            ReCommitAfterRmFailTransaction2PC();
+            Console.WriteLine("7. TM dies before receive prepare from all RM, on recovery, the transaction abort");
+            Pause();
+            TMFailsBeforeReceivingAllPrepare2PC();
             Console.WriteLine("8. TM dies before receiving Done from all RMs, on recovery, TM should recommit");
             Pause();
             TMFailsBeforeReceivingAllDone2PC();
