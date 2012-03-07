@@ -120,7 +120,7 @@ namespace MyRM
         {
             while (!isReady || _transactionManager == null)
             {
-                Thread.Sleep(500);
+                Thread.Sleep(100);
             }
         }
 
@@ -144,7 +144,6 @@ namespace MyRM
         {
             isReady = false; // set isReady false because we want to make sure the actual code is not executed before the rm is going into the stable loop waiting.
             RMParser parser = new RMParser();
-
             if (!parser.Parse(args))
             {
                 return;
@@ -292,9 +291,10 @@ namespace MyRM
             ++NumberCommits;
             if (NumberCommits >= this.VoteNoOnCommit && this.VoteNoOnCommit != 0)
             {
-                return XaResponse.XAER_RMERR;
+                Process.GetCurrentProcess().Kill();
+                //return XaResponse.XAER_RMERR;
             }
-            // transactionManager.Commit(context);
+
             _transactionStorage.Commit(context);
             _lockManager.UnlockAll(context);
             return XaResponse.XA_OK;
@@ -307,12 +307,12 @@ namespace MyRM
         public XaResponse Abort(TP.Transaction context)
         {
             WaitForReady();
+
             ++NumberAborts;
             if (NumberAborts >= this.VoteNoOnAbort && this.VoteNoOnAbort != 0)
             {
                 return XaResponse.XAER_RMERR;
             }
-            // transactionManager.Abort(context);
             _transactionStorage.Abort(context);
             _lockManager.UnlockAll(context);
             return XaResponse.XA_OK;

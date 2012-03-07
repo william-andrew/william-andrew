@@ -61,6 +61,7 @@ namespace MyTM
                         string line;
                         lock (committedTransactions)
                         {
+                            committedTransactions = new Dictionary<Transaction, CommitedTransaction>();
                             using (StreamReader reader = new StreamReader(LogFileName))
                             {
                                 while ((line = reader.ReadLine()) != null)
@@ -77,17 +78,19 @@ namespace MyTM
                                 }
                             }
                         }
-
-                        foreach (CommitedTransaction trans in committedTransactions.Values)
-                        {
-                            if (trans.State == CommitState.Committed || trans.State == CommitState.Prepared)
-                            {
-                                trans.Recover();
-                            }
-                        }
                     }
 
                     isInitialized = true;
+
+                    // The DB recovery code shall have locked the resources before this statement. 
+                    // Therefore, the subsequential query on the modified resources will be blocked until the recover process is finished
+                    foreach (CommitedTransaction trans in committedTransactions.Values)
+                    {
+                        if (trans.State == CommitState.Committed || trans.State == CommitState.Prepared)
+                        {
+                            trans.Recover();
+                        }
+                    }
                 }
             }
         }
@@ -107,7 +110,7 @@ namespace MyTM
             StartUp();
 
             CommitedTransaction trans = new CommitedTransaction(context, rms);
-            lock (committedTransactions)
+            lock (syncRoot)
             {
                 if (!committedTransactions.ContainsKey(context))
                 {
@@ -131,6 +134,7 @@ namespace MyTM
                     }
                 });
             return trans;
+
         }
 
         public static void PrintMessage()
@@ -148,7 +152,7 @@ namespace MyTM
 
         public static void DoneCommit(Transaction context)
         {
-            lock (committedTransactions)
+            lock (syncRoot)
             {
                 if (committedTransactions.ContainsKey(context) && !string.IsNullOrWhiteSpace(committedTransactions[context].Message))
                 {
@@ -167,7 +171,7 @@ namespace MyTM
         public static void WriteLog()
         {
             string fileContent = string.Empty;
-            lock (committedTransactions)
+            lock (syncRoot)
             {
                 foreach (CommitedTransaction t in committedTransactions.Values)
                 {

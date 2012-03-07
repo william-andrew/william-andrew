@@ -45,7 +45,7 @@ namespace MyTM
         {
             while (!TwoPhaseCommit.IsInitialized)
             {
-                Thread.Sleep(1000);
+                Thread.Sleep(100);
             }
         }
 
@@ -98,7 +98,6 @@ namespace MyTM
 
         public RM GetResourceMananger(string name)
         {
-            WaitTillReady();
             lock (_resourceManagers)
             {                
                 foreach (RM rm in _resourceManagers.Values)
@@ -175,7 +174,6 @@ namespace MyTM
         /// <param name="enlistingRM"> </param>
         public bool Enlist(TP.Transaction context, string enlistingRM)
         {
-            WaitTillReady();
             var rm = GetResourceMananger(enlistingRM);
             if (rm == null)
             {
@@ -206,7 +204,6 @@ namespace MyTM
 
         public void Register(string msg)
         {
-            WaitTillReady();
             string[] URL = msg.Split('$');
             Console.WriteLine("Register " + URL[0]);
             TP.RM newRM = (TP.RM)Activator.GetObject(typeof(TP.RM), URL[0]);
@@ -240,17 +237,6 @@ namespace MyTM
             if (null != _transactionScavengerThread)
                 _transactionScavengerThread.Join();
         }
-
-
-        protected void init(String[] args)
-        {
-        }
-        
-        protected void startUp()
-        {
-            // TODO start garbage collector?
-        }
-
 
         class TMParser : CommandLineParser
         {

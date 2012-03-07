@@ -70,6 +70,7 @@
         public void UncommittedScenario()
         {
             StartUp();
+            Console.WriteLine("Flight RM shall terminate before transaction commits. ");
             Customer c = new Customer("12345678-1234-1234-1234-123456789012");
             FlightsRM.SelfDestruct(2, 0, 0, 0);
             string[] flights = new string[] { "SEA->LAX", "LAX->LAV" };
@@ -82,8 +83,9 @@
                 // Expected error because one of the RM will be selfdestroyed. 
                 Console.WriteLine(e.Message);
             }
-            StopRMs();
-            StartRMs();
+            
+            Console.WriteLine("Restarting flight RM");
+            StartFlightsRM();
             Transaction t = WorkflowControl.Start();
             string actual = WorkflowControl.QueryItinerary(t, c);
             Console.WriteLine(actual);
@@ -171,6 +173,7 @@
             string[] flights = new string[] { "SEA->LAX", "LAX->LAV" };
             WorkflowControl.ReserveItinerary(c, flights, "Vegas", true, true);
             // We shall see some rollback message from TM. 
+            Console.WriteLine("One RM failed at prepare. TM will rollback all prepared RMs");
             Pause();
             Transaction t = WorkflowControl.Start();
             string actual = WorkflowControl.QueryItinerary(t, c);
@@ -195,16 +198,22 @@
             CarsRM.SelfDestruct(0, 0, 1, 0);
             Customer c = new Customer("12345678-1234-1234-1234-123456789012");
             string[] flights = new string[] { "SEA->LAX", "LAX->LAV" };
-
+            AutoResetEvent startCarRMevent = new AutoResetEvent(false);
             ThreadPool.QueueUserWorkItem(o =>
                 {
-                    Thread.Sleep(1000);
-                    CarsRM.SelfDestruct(0, 0, 0, 0);
+                    WorkflowControl.ReserveItinerary(c, flights, "Vegas", true, true);
+                    Thread.Sleep(10000);
+                    startCarRMevent.Set();
                 });
-            WorkflowControl.ReserveItinerary(c, flights, "Vegas", true, true);
+            string actual = PrintCars();
+            Assert.AreEqual("Vegas,1,3;NewYork,10,30;", actual);
             // We shall see some commit retry message from TM but the transaction shall success. 
+            Console.WriteLine("One RM failed at commit. TM will retry commit for all RMs");
+            Pause();
+            StartCarsRM();
+            startCarRMevent.WaitOne();
             Transaction t = WorkflowControl.Start();
-            string actual = WorkflowControl.QueryItinerary(t, c);
+            actual = WorkflowControl.QueryItinerary(t, c);
             Console.WriteLine(actual);
             Assert.AreEqual("F:SEA->LAX,F:LAX->LAV,C:Vegas,R:Vegas", actual);
             actual = PrintCars();
@@ -229,10 +238,14 @@
             TransactionManager.SelfDestruct(true, false);
             ThreadPool.QueueUserWorkItem(o => WorkflowControl.Commit(t));
 
-            // TM shall be kill, now restart it            
+            // TM shall be kill, now restart it        
+            Console.Write("TM is killed, next is to restart it");
             Pause();
 
             StartTM();
+
+            // Wait to make sure all recover job is done
+            Thread.Sleep(2000);
             // shall see the transaction aborts
             t = WorkflowControl.Start();
             string actual = PrintCars();
@@ -257,8 +270,11 @@
             ThreadPool.QueueUserWorkItem(o => WorkflowControl.Commit(t));
 
             // TM shall be kill, now restart it
+            Console.Write("TM is killed, next is to restart it");
             Pause();
             StartTM();
+            // Wait to make sure all recover job is done
+            Thread.Sleep(2000);
             // shall see the transaction recommits. 
             t = WorkflowControl.Start();
             string actual = PrintCars();
