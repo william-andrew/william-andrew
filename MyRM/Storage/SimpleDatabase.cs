@@ -194,7 +194,7 @@ namespace MyRM.Storage
                     {
                         var log = logs[i];
 
-                        if (log.PageIndex == index.PageIndex && log.RowIndex == index.RowIndex)
+                        if (log.PageIndex == index.PageIndex && log.RowIndex == index.RowIndex && log.TableName == tableName)
                             return log.Image;
                     }
                 }
