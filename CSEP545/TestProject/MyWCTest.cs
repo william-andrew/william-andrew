@@ -2,7 +2,6 @@
 using TP;
 using Transaction = TP.Transaction;
 using System.Linq;
-using System.IO;
 using System;
 using MyWC;
 
@@ -15,6 +14,82 @@ namespace TestProject
         public void CleanPreviousData()
         {
             CommonFunction.CleanUpAll();
+        }
+
+        /// <summary>
+        ///A test for AddSeats
+        ///</summary>
+        [TestMethod]
+        public void AddManyFlightsTest()
+        {
+            var wc = new MyWC.MyWC_Accessor();
+            var tm = new MyTM.MyTM();
+            var rm = new MyRM.MyRM();
+            MyWC_Accessor.TransactionManager = tm;
+            rm.SetName("flight");
+            rm.TransactionManager = tm;
+            tm.Register(rm);
+            MyWC.MyWC.Flights = tm.GetResourceMananger("flight");
+
+            var context = wc.Start();
+            wc.AddSeats(context, "FL", 100, 550);
+            wc.AddSeats(context, "SG", 200, 250);
+            wc.AddSeats(context, "SG1", 201, 251);
+            wc.AddSeats(context, "SG2", 202, 252);
+            wc.AddSeats(context, "SG3", 203, 253);
+            wc.AddSeats(context, "SG4", 204, 254);
+            wc.AddSeats(context, "SG5", 205, 255);
+            wc.AddSeats(context, "SG5", 206, 256);
+            wc.AddSeats(context, "SG6", 207, 257);
+            wc.Abort(context);
+
+            context = wc.Start();
+            var result = wc.ListFlights(context);
+            wc.Commit(context);
+            Assert.AreEqual(0, result.Length);
+
+            context = wc.Start();
+            wc.AddSeats(context, "FL", 100, 550);
+            wc.AddSeats(context, "SG", 200, 250);
+            wc.AddSeats(context, "SG1", 201, 251);
+            wc.AddSeats(context, "SG2", 202, 252);
+            wc.AddSeats(context, "SG3", 203, 253);
+            wc.AddSeats(context, "SG4", 204, 254);
+            wc.AddSeats(context, "SG5", 205, 255);
+            wc.AddSeats(context, "SG5", 206, 256);
+            wc.AddSeats(context, "SG6", 207, 257);
+            wc.Commit(context);
+
+            context = wc.Start();
+            result = wc.ListFlights(context);
+            wc.Commit(context);
+            Assert.AreEqual(8, result.Length);
+
+            context = wc.Start();
+            wc.AddSeats(context, "FL", 50, 450);
+            wc.Commit(context);
+
+            context = wc.Start();
+            var c = wc.QueryFlight(context, "FL");
+            Assert.AreEqual(150, c);
+            var price = wc.QueryFlightPrice(context, "FL");
+            Assert.AreEqual(450, price);
+            wc.Abort(context);
+
+            context = wc.Start();
+            c = wc.QueryFlight(context, "SG");
+            price = wc.QueryFlightPrice(context, "SG");
+            Assert.AreEqual(200, c);
+            Assert.AreEqual(250, price);
+            wc.Abort(context);
+
+            context = wc.Start();
+            c = wc.QueryFlight(context, "SG5");
+            price = wc.QueryFlightPrice(context, "SG5");
+            Assert.AreEqual(411, c);
+            Assert.AreEqual(256, price);
+            wc.Abort(context);
+
         }
 
         /// <summary>
