@@ -334,6 +334,33 @@ namespace TestProject
         }
 
         [TestMethod]
+        public void InsertCrashAndReCommitTest()
+        {
+            var db = new SimpleDatabase_Accessor("2PC9", true);
+            db.Initialize();
+            const int rowSize = 100;
+            var key1 = new string('1', 36);
+
+            var encoder = new UTF8Encoding();
+            var tid = new Transaction();
+
+            db.CreateTable("Inventory.Car", rowSize);
+            db.InsertRecord(tid, "Inventory.Car", key1, new Row(rowSize)
+            {
+                Data = encoder.GetBytes("AAA")
+            });
+
+            db.Prepare(tid);
+            db.PrepareRecoveryOnStart();
+            db.Commit(tid);
+
+            var rows = db.ReadAllRecords(new Transaction(), "Inventory.Car");
+            Assert.AreEqual(1, rows.Keys.Count);
+
+            Assert.AreEqual("AAA", rows[key1].DataString);
+        }
+
+        [TestMethod]
         public void InsertCommitTest()
         {
             var db = new SimpleDatabase_Accessor("2PC6", true);

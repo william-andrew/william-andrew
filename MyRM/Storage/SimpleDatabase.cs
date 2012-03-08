@@ -1016,7 +1016,7 @@ namespace MyRM.Storage
         {
             try
             {
-                lock (_transactionLogsForPrepare)
+                lock (_transactionLogsForCommit)
                 {
                     _transactionLogsForCommit.Clear();
 
@@ -1030,10 +1030,10 @@ namespace MyRM.Storage
                             {
                                 if (!_transactionLogsForPrepare.ContainsKey(index.TransactionId.Value))
                                 {
-                                    _transactionLogsForPrepare.Add(index.TransactionId.Value, new List<UpdateLog>());
+                                    _transactionLogsForCommit.Add(index.TransactionId.Value, new List<UpdateLog>());
                                 }
 
-                                var logs = _transactionLogsForPrepare[index.TransactionId.Value];
+                                var logs = _transactionLogsForCommit[index.TransactionId.Value];
 
                                 logs.Add(new UpdateLog
                                              {
