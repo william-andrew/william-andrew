@@ -386,7 +386,7 @@ namespace MyRM.Storage
 
                         foreach (UpdateLog t in list)
                         {
-                            if (t.TransactionId == tid.Id && t.Key == key && t.OperationType == OperationType.Insert)
+                            if (t.TransactionId == tid.Id && Trim(t.Key) == key && t.OperationType == OperationType.Insert)
                             {
                                 t.Image = log.Image;
                                 return;
@@ -394,7 +394,17 @@ namespace MyRM.Storage
                         }
                     }
                     else
-                        _transactionLogsForPrepare[tid.Id].Add(log);
+                    {
+                        var logs = _transactionLogsForPrepare[tid.Id];
+                        var existingLog = (from l in logs where l.Key == key select l).FirstOrDefault();
+
+                        if (existingLog != null)
+                            existingLog.Image = log.Image;
+                        else
+                        {
+                            logs.Add(log);
+                        }
+                    }
                 }
                 else
                 {
@@ -458,7 +468,23 @@ namespace MyRM.Storage
                 };
                 if (_transactionLogsForPrepare.ContainsKey(tid.Id))
                 {
-                    _transactionLogsForPrepare[tid.Id].Add(log);
+                    var logs = _transactionLogsForPrepare[tid.Id];
+                    var existingLog = (from l in logs where l.Key == key select l).FirstOrDefault();
+
+                    if (existingLog != null)
+                    {
+                        if (existingLog.OperationType == OperationType.Insert)
+                        {
+                            //cancel the insertion
+                            logs.Remove(existingLog);
+                            logs.Add(log);
+                        }
+                    }
+                    else
+                    {
+                        logs.Add(log);
+                    }
+    
                 }
                 else
                 {
@@ -491,10 +517,12 @@ namespace MyRM.Storage
 
                                 var distinctPages = logs.Select(log => log.PageIndex).Distinct();
                                 //group by same page
-                                foreach (var pageId in distinctPages)
+                                foreach (var pageIndex in distinctPages)
                                 {
-                                    var currentId = pageId;
-                                    var logsForPage = (from l in logs where l.PageIndex == currentId && l.TableName == currentTable select l)
+                                    var currentId = pageIndex;
+                                    var logsForPage = (from l in logs where l.PageIndex == currentId && l.TableName == currentTable 
+                                                       && l.OperationType != OperationType.Detete
+                                                       select l)
                                         .ToArray();
 
                                     //read active page and prepare the shadow page
@@ -503,7 +531,7 @@ namespace MyRM.Storage
                                         var logTemp = logsForPage[0];
                                         var indexTemp =
                                             (from i in pageTable.RecordIndices
-                                             where i.PageIndex == pageId
+                                             where i.PageIndex == pageIndex
                                              select i).FirstOrDefault();
 
                                         int activeFileId = indexTemp != null ? (indexTemp.ActiveFileId < 0 ? indexTemp.ShadowFileId : indexTemp.ActiveFileId) : 0;
@@ -519,6 +547,7 @@ namespace MyRM.Storage
 
                                             index.IsDirty = 1;
                                             index.TransactionId = log.TransactionId;
+                                            
                                             //install record level changes
                                             page.UpdateRow(log.Image, log.RowIndex);
 
@@ -530,7 +559,7 @@ namespace MyRM.Storage
                                         DiskWritePage(currentTable, page, shadowFileId);
 
                                         //save page tableName file
-                                        UpdateShadowIdsForPage(pageTable, pageId, shadowFileId, tid.Id);
+                                        UpdateShadowIdsForPage(pageTable, pageIndex, shadowFileId, tid.Id);
                                         DiskWritePageTable(currentTable, pageTable);
                                     }
                                 }
@@ -545,6 +574,7 @@ namespace MyRM.Storage
             catch (Exception e)
             {
                 System.Console.WriteLine("DB:Prepare: \n" + e);
+                throw;
             }
         }
 
@@ -568,8 +598,8 @@ namespace MyRM.Storage
                         {
                             var pageTable = DiskReadPageTable(log.TableName);
 
-                            var index =
-                                (from i in pageTable.RecordIndices where Trim(i.Key) == log.Key select i).Single();
+                            var index = (from i in pageTable.RecordIndices where Trim(i.Key) == log.Key && 
+                                     i.TransactionId == tid.Id select i).Single();
 
                             if (log.OperationType == OperationType.Insert)
                             {
@@ -600,6 +630,7 @@ namespace MyRM.Storage
             catch (Exception e)
             {
                 System.Console.WriteLine("DB:Commit: \n" + e);
+                throw;
             }
         }
 
@@ -713,7 +744,7 @@ namespace MyRM.Storage
             return key.TrimEnd('\0');
         }
 
-        //depricated, was used for 1 phase commit
+        //depricated, was used for 1 phase commit and some old tests
         private void CommitPages(Transaction tid, List<Page> pages)
         {
             foreach (var page in pages)
