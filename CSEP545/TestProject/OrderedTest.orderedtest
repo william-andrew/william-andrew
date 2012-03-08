@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
-<OrderedTest name="OrderedTest1" storage="c:\users\lwl\csep545\william-andrew\csep545\testproject\orderedtest1.orderedtest" id="2448cd2c-f864-49d0-b757-02a611f72254" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+<OrderedTest name="orderedtest" storage="c:\users\weilil\csep545\csep545\testproject\orderedtest.orderedtest" id="2448cd2c-f864-49d0-b757-02a611f72254" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
   <TestLinks>
     <TestLink id="f5fd0d2d-81a3-59fd-c7ad-5aa8cc89d219" name="AbortTest" storage="bin\debug\testproject.dll" type="Microsoft.VisualStudio.TestTools.TestTypes.Unit.UnitTestElement, Microsoft.VisualStudio.QualityTools.Tips.UnitTest.ObjectModel, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
     <TestLink id="16ab3876-3595-33d4-27d4-3f6e01db307b" name="AddDeleteCars" storage="bin\debug\testproject.dll" type="Microsoft.VisualStudio.TestTools.TestTypes.Unit.UnitTestElement, Microsoft.VisualStudio.QualityTools.Tips.UnitTest.ObjectModel, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />

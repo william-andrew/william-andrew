@@ -291,8 +291,7 @@ namespace MyRM
             ++NumberCommits;
             if (NumberCommits >= this.VoteNoOnCommit && this.VoteNoOnCommit != 0)
             {
-                Process.GetCurrentProcess().Kill();
-                //return XaResponse.XAER_RMERR;
+                return XaResponse.XAER_RMERR;
             }
 
             _transactionStorage.Commit(context);

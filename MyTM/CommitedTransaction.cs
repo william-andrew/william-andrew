@@ -12,11 +12,13 @@ namespace MyTM
     {
         private const int maxRetry = 3; 
         private static int expBackoff = 500; // exponential back off starts from 500ms
-        private static int stepTimeout = 2000; // millisecond
+        private static int stepTimeout = 5000; // millisecond
         private List<CommitState> rmCommitStates;
         private AutoResetEvent stepWaitEvent = new AutoResetEvent(false);
         private bool prepareFail; // exit before all RM is prepared (send Prepare to 1 RM then killed)
         private bool commitFail; //exit before all RM are done (send commited to 1 RM then killed)
+        private object syncPrepare = new object();
+        private object syncCommit = new object();
         public string Message = string.Empty;
         public CommitedTransaction(Transaction context, ResourceManagerList rms)
         {
@@ -83,6 +85,10 @@ namespace MyTM
                     break;
             }
 
+            for (int i = 0; i < result.rmCommitStates.Count; i++)
+            {
+                result.rmCommitStates[i] = result.State;
+            }
             return result;
         }
         /// <summary>
@@ -179,7 +185,22 @@ namespace MyTM
         {
             foreach (RM rm in this.ResouceManagers.ResourceManagers)
             {
-                rm.Ping();
+                RM inTM = null;
+                while (inTM == null)
+                {
+                    try
+                    {
+                        inTM = MyTM.StaticGetResourceMananger(rm.GetName());
+                    }
+                    catch (WebException)
+                    {
+                    }
+
+                    if (inTM == null)
+                    {
+                        MyTM.StaticRegister(rm);
+                    }
+                }
             }
             switch (State)
             {
@@ -216,22 +237,29 @@ namespace MyTM
                 Console.Write(outstring);
                 ThreadPool.QueueUserWorkItem(o =>
                 {
-                    while (true)
+                    lock (syncPrepare)
                     {
-                        try
+                        if (rmCommitStates[temp] == CommitState.Committed)
                         {
-                            XaResponse response = r.Prepare(this.Context);
-                            if (response == XaResponse.XA_OK)
+                            while (true)
                             {
-                                this.SetState(temp, CommitState.Prepared);
+                                try
+                                {
+                                    XaResponse response = r.Prepare(this.Context);
+                                    if (response == XaResponse.XA_OK)
+                                    {
+                                        this.SetState(temp, CommitState.Prepared);
+                                    }
+                                    break;
+                                }
+                                catch (WebException)
+                                {
+                                }
+                                Console.WriteLine("ResourceManager {0} is not ready, wait 0.5 second",
+                                                  this.ResouceManagers.RMNames[temp]);
+                                Thread.Sleep(500);
                             }
-                            break;
                         }
-                        catch (WebException)
-                        {
-                        }
-                        Console.WriteLine("ResourceManager {0} is not ready, wait 0.5 second", this.ResouceManagers.RMNames[temp]);
-                        Thread.Sleep(500);
                     }
                 });
 
@@ -254,23 +282,30 @@ namespace MyTM
                 Console.Write(outstring);
                 ThreadPool.QueueUserWorkItem(o =>
                 {
-
-                    while (true)
+                    lock (syncCommit)
                     {
-                        try
+                        if (rmCommitStates[temp] == CommitState.Prepared)
                         {
-                            XaResponse response = r.Commit(this.Context);
-                            if (response == XaResponse.XA_OK)
+                            while (true)
                             {
-                                this.SetState(temp, CommitState.Done);
+                                try
+                                {
+                                    XaResponse response = r.Commit(this.Context);
+                                    if (response == XaResponse.XA_OK)
+                                    {
+                                        this.SetState(temp, CommitState.Done);
+                                    }
+
+                                    break;
+                                }
+                                catch (WebException)
+                                {
+                                }
+                                Console.WriteLine("ResourceManager {0} is not ready, wait 0.5 second",
+                                                  this.ResouceManagers.RMNames[temp]);
+                                Thread.Sleep(500);
                             }
-                            break;
                         }
-                        catch (WebException)
-                        {
-                        }
-                        Console.WriteLine("ResourceManager {0} is not ready, wait 0.5 second", this.ResouceManagers.RMNames[temp]);
-                        Thread.Sleep(500);
                     }
                 });
 

@@ -17,7 +17,7 @@ namespace MyTM
     public class MyTM : MarshalByRefObject, TP.TM
     {
         public class TransactionState{}
-        private readonly Dictionary<string, RM> _resourceManagers;
+        private static Dictionary<string, RM> _resourceManagers = _resourceManagers = new Dictionary<string, RM>();
         private readonly Dictionary<Transaction, ResourceManagerList> _resourceManagersEnlistedInTransactions
             = new Dictionary<Transaction, ResourceManagerList>();
 
@@ -29,7 +29,6 @@ namespace MyTM
         public MyTM()
         {
             Console.WriteLine("TM: Transaction Manager instantiated");
-            _resourceManagers = new Dictionary<string, RM>();
             // by default, the TwoPhaseCommit shall not have the debugging properties PrepareFail and CommitFail set
             TwoPhaseCommit.PrepareFail = false;
             TwoPhaseCommit.CommitFail = false;
@@ -98,8 +97,13 @@ namespace MyTM
 
         public RM GetResourceMananger(string name)
         {
+            return StaticGetResourceMananger(name);
+        }
+
+        public static RM StaticGetResourceMananger(string name)
+        {
             lock (_resourceManagers)
-            {                
+            {
                 foreach (RM rm in _resourceManagers.Values)
                 {
                     if (String.Compare(rm.GetName(), name, StringComparison.OrdinalIgnoreCase) == 0)
@@ -224,11 +228,16 @@ namespace MyTM
         //TODO: REFACTOR THIS FOR TESTING
         public void Register(TP.RM rm)
         {
-            WaitTillReady();
-            _resourceManagers.Add(rm.GetName(), rm);
+            _resourceManagers[rm.GetName()] = rm;
             
         }
 
+        public static void StaticRegister(TP.RM rm)
+        {
+            _resourceManagers[rm.GetName()] = rm;
+            Console.WriteLine("Re-Register " + rm.GetName());
+        }
+        
         public void shutdown()
         {
             // TODO DO PROPER SHUTDOWN HERE

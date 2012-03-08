@@ -16,8 +16,10 @@ namespace TestProject
         [TestInitialize]
         public void Init()
         {
-            MyRM.MyRM rm = new MyRM.MyRM();
-            rm.SetName("test");
+        //    MyRM.MyRM rm = new MyRM.MyRM();
+        //    rm.SetName("test");
+
+            CommonFunction.CleanUpAll();
         }
 
         [TestCleanup]
@@ -31,8 +33,7 @@ namespace TestProject
         [TestMethod()]
         public void AddTest()
         {
-            MyRM.MyRM_Accessor rm = MockRM();
-            rm.SetName("AddTest");
+            MyRM.MyRM_Accessor rm = MockRM("AddTest");
             Transaction context = new Transaction(); 
             RID i = new RID(RID.Type.ROOM, "test1");
             int count = 1; 
@@ -50,8 +51,7 @@ namespace TestProject
         [TestMethod()]
         public void CommitTest()
         {
-            MyRM.MyRM_Accessor rm = MockRM();
-            rm.SetName("CommitTest");
+            MyRM.MyRM_Accessor rm = MockRM("CommitTest");
             Transaction context = new Transaction();
             Transaction context1 = new Transaction();
             RID i = new RID(RID.Type.ROOM, "test1");
@@ -62,7 +62,7 @@ namespace TestProject
             rm.Commit(context);
             Assert.AreEqual(price, rm.QueryPrice(context1, i));
         }
-
+        
         /// <summary>
         ///A test for Delete,
         /// also test Query, Reserve, QueryReservedPrice, QueryReserved
@@ -71,8 +71,8 @@ namespace TestProject
         [ExpectedException(typeof(ArgumentException))]
         public void DeleteTest()
         {
-            MyRM.MyRM_Accessor rm = MockRM();
-            rm.SetName("DeleteTest" + Guid.NewGuid());
+            string rmName = "DeleteTest" + Guid.NewGuid();
+            MyRM.MyRM_Accessor rm = MockRM(rmName);
             Transaction context = new Transaction();
             Customer c = new Customer();
             RID rid = new RID(RID.Type.ROOM, "test1");
@@ -117,8 +117,7 @@ namespace TestProject
         [TestMethod()]
         public void UnReserveTest()
         {
-            MyRM.MyRM_Accessor rm = MockRM();
-            rm.SetName("UnReserveTest");
+            MyRM.MyRM_Accessor rm = MockRM("UnReserveTest");
             Transaction context = new Transaction();
             Customer c = new Customer();
             RID rid = new RID(RID.Type.ROOM, "test1");
@@ -136,10 +135,10 @@ namespace TestProject
             Assert.AreEqual(count, rm.Query(context, rid));
         }
 
-        public static MyRM.MyRM_Accessor MockRM()
+        public static MyRM.MyRM_Accessor MockRM(string dbname="test")
         {
 
-            var db = new SimpleDatabase("file", true);
+            var db = new SimpleDatabase(dbname, true);
             db.CreateTable(Constants.ReservationTableName, 96, 36);
             db.CreateTable(Constants.ResourcesTableName, 96, 36);
             var tm = new MyTM.MyTM();
@@ -147,7 +146,7 @@ namespace TestProject
                 {
                     _transactionStorage = new TransactionStorage(db),
                     TransactionManager = tm,
-                    _name =  "test"
+                    _name =  dbname
                 };
             tm.Register(rm);
             return rm;

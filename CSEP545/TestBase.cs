@@ -195,25 +195,15 @@
         public void ReCommitAfterRmFailTransaction2PC()
         {
             StartUp();
-            CarsRM.SelfDestruct(0, 0, 1, 0);
-            Customer c = new Customer("12345678-1234-1234-1234-123456789012");
-            string[] flights = new string[] { "SEA->LAX", "LAX->LAV" };
-            AutoResetEvent startCarRMevent = new AutoResetEvent(false);
-            ThreadPool.QueueUserWorkItem(o =>
-                {
-                    WorkflowControl.ReserveItinerary(c, flights, "Vegas", true, true);
-                    Thread.Sleep(10000);
-                    startCarRMevent.Set();
-                });
-            string actual = PrintCars();
-            Assert.AreEqual("Vegas,1,3;NewYork,10,30;", actual);
-            // We shall see some commit retry message from TM but the transaction shall success. 
-            Console.WriteLine("One RM failed at commit. TM will retry commit for all RMs");
-            Pause();
-            StartCarsRM();
-            startCarRMevent.WaitOne();
-            Transaction t = WorkflowControl.Start();
-            actual = WorkflowControl.QueryItinerary(t, c);
+
+            CarsRM.SelfDestruct(0, 0, 1, 0); 
+            Customer c = new Customer("12345678-1234-1234-1234-123456789012"); 
+            string[] flights = new string[] { "SEA->LAX", "LAX->LAV" }; 
+            ThreadPool.QueueUserWorkItem(o => { Thread.Sleep(1000); CarsRM.SelfDestruct(0, 0, 0, 0); }); 
+            WorkflowControl.ReserveItinerary(c, flights, "Vegas", true, true);            
+            // We shall see some commit retry message from TM but the transaction shall success.             
+            Transaction t = WorkflowControl.Start();            
+            string actual = WorkflowControl.QueryItinerary(t, c);
             Console.WriteLine(actual);
             Assert.AreEqual("F:SEA->LAX,F:LAX->LAV,C:Vegas,R:Vegas", actual);
             actual = PrintCars();
@@ -274,11 +264,10 @@
             Pause();
             StartTM();
             // Wait to make sure all recover job is done
-            Thread.Sleep(2000);
             // shall see the transaction recommits. 
             t = WorkflowControl.Start();
             string actual = PrintCars();
-            Assert.AreEqual("Vegas,1,3;NewYork,10,30;Seattle,10,100;", actual);
+            Assert.AreEqual("Vegas,1,3;NewYork,10,30;", actual);
             actual = PrintRooms();
             Assert.AreEqual("Vegas,2,1;NewYork,20,10;", actual);
             actual = PrintFlights();
@@ -435,6 +424,7 @@
             }
 
             StartProcesses();
+
             this.WorkflowControl = (TP.WC)System.Activator.GetObject(typeof(RM), "http://localhost:8086/WC.soap");
             this.CarsRM = (RM)System.Activator.GetObject(typeof(RM), "http://localhost:8082/RM.soap");
             this.RoomsRM = (RM)System.Activator.GetObject(typeof(RM), "http://localhost:8083/RM.soap");

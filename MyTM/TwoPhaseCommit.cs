@@ -8,11 +8,11 @@ namespace MyTM
 {
     public enum CommitState
     {
-        None,
-        Committed,
-        Prepared,
-        Done,
-        Rollbacked
+        None,      // the default state
+        Committed, // when the 2PC starts to commmit
+        Prepared,  // All RMs are prepared
+        Done,      // All RMs are commited
+        Rollbacked // Transaction rollbacked
     }
 
     // TODO: implemnt fault recovery
@@ -124,13 +124,10 @@ namespace MyTM
 
             ThreadPool.QueueUserWorkItem(o =>
                 {
-                    lock (trans)
+                    if (trans.State < CommitState.Committed)
                     {
-                        if (trans.State < CommitState.Committed)
-                        {
-                            trans.State = CommitState.Committed;
-                            trans.StartCommit(PrepareFail, CommitFail);
-                        }
+                        trans.State = CommitState.Committed;
+                        trans.StartCommit(PrepareFail, CommitFail);
                     }
                 });
             return trans;
