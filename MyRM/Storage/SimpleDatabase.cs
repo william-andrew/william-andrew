@@ -546,6 +546,10 @@ namespace MyRM.Storage
                                                     Single();
 
                                             index.IsDirty = 1;
+
+                                            if (index.TransactionId != null && index.TransactionId != log.TransactionId)
+                                                throw new ApplicationException("record has a transaction pending");
+
                                             index.TransactionId = log.TransactionId;
                                             
                                             //install record level changes
