@@ -1028,7 +1028,7 @@ namespace MyRM.Storage
                         {
                             if (index.TransactionId != null && index.TransactionId != Guid.Empty)
                             {
-                                if (!_transactionLogsForPrepare.ContainsKey(index.TransactionId.Value))
+                                if (!_transactionLogsForCommit.ContainsKey(index.TransactionId.Value))
                                 {
                                     _transactionLogsForCommit.Add(index.TransactionId.Value, new List<UpdateLog>());
                                 }
